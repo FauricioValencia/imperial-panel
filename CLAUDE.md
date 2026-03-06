@@ -113,15 +113,29 @@ Texto sec:    #64748B  (Gris medio)
 
 ## Base de datos - Reglas
 
+### Referencia de esquema
+- **`docs/DATABASE.md`**: Documentacion manual con diagrama ERD (Mermaid), diccionario de datos y flujos de negocio.
+- **`docs/DB_SNAPSHOT.md`**: Generado automaticamente desde la DB real. Ejecutar `npm run db:snapshot` para regenerar.
+- **`supabase/migrations/`**: Migraciones SQL versionadas. Toda modificacion de esquema va aqui.
+
+### Flujo para cambios de esquema
+1. Crear nueva migracion en `supabase/migrations/` con nombre descriptivo (ej: `002_agregar_campo_x.sql`).
+2. Ejecutar la migracion en Supabase (SQL Editor o CLI).
+3. Ejecutar `npm run db:snapshot` para capturar el estado real de la DB (tablas, policies, functions, triggers, indices).
+4. Actualizar `docs/DATABASE.md` con los cambios conceptuales (diagrama, flujos, reglas).
+5. Siempre consultar `docs/DB_SNAPSHOT.md` antes de escribir queries o actions para verificar la estructura actual.
+
 ### Nunca hacer
 - DELETE en tablas de clientes, productos o usuarios. Usar soft delete (campo `activo`).
-- Modificar stock sin usar funciones RPC (evitar race conditions).
+- Modificar `productos.stock` directamente con UPDATE. Siempre usar funciones RPC (`descontar_stock`, `reingresar_stock`).
 - Queries sin indice en tablas grandes.
+- Editar `docs/DB_SNAPSHOT.md` manualmente. Siempre regenerar con `npm run db:snapshot`.
 
 ### Siempre hacer
-- Auditoría via tabla `audit_log` para operaciones financieras.
+- Auditoría via tabla `audit_log` para operaciones financieras (triggers automaticos en pagos, pedidos, movimientos, productos).
 - Transacciones para operaciones que modifican multiples tablas.
 - Indices en foreign keys y campos de filtro frecuente.
+- Consultar `docs/DB_SNAPSHOT.md` para verificar policies, functions y estructura real antes de desarrollar.
 
 ## Testing
 - Vitest para unit tests de funciones y Server Actions.
