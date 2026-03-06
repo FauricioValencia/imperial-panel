@@ -1,6 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { listarProductos } from "@/actions/inventario";
+import { TablaProductos } from "@/components/admin/inventario/tabla-productos";
 
-export default function InventarioPage() {
+export default async function InventarioPage() {
+  const resultado = await listarProductos();
+  const productos = resultado.data ?? [];
+
   return (
     <div className="space-y-6">
       <div>
@@ -9,16 +13,7 @@ export default function InventarioPage() {
           Productos, stock y movimientos
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Productos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-[#64748B]">
-            Conecte la base de datos para ver los productos.
-          </p>
-        </CardContent>
-      </Card>
+      <TablaProductos productosIniciales={productos} />
     </div>
   );
 }

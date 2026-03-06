@@ -295,17 +295,19 @@ registrarPago(pedido_id, monto, tipo) =>
 
 ## 8. Fases de Desarrollo
 
-### Fase 1 - Fundacion (Semana 1-2)
-- [ ] Setup Next.js 15 + TypeScript + Tailwind + shadcn/ui
-- [ ] Configurar Supabase (proyecto, tablas, RLS)
-- [ ] Autenticacion (login, roles, middleware)
-- [ ] Layout admin y layout mensajero
-- [ ] Sistema de logging basico
+### Fase 1 - Fundacion (Semana 1-2) ✅
+- [x] Setup Next.js 15 + TypeScript + Tailwind + shadcn/ui
+- [x] Configurar Supabase (proyecto, tablas, RLS)
+- [x] Autenticacion (login, roles, middleware)
+- [x] Layout admin y layout mensajero
+- [x] Sistema de logging basico
 
-### Fase 2 - Inventario (Semana 3)
-- [ ] CRUD de productos
-- [ ] Movimientos de inventario
-- [ ] Alertas de stock bajo
+### Fase 2 - Inventario + Clientes (Semana 3) ✅
+- [x] CRUD de clientes (tabla, crear, editar, desactivar)
+- [x] CRUD de productos (tabla, crear, editar, desactivar)
+- [x] Registro de entradas de inventario (movimientos manuales)
+- [x] Historial de movimientos por producto
+- [x] Alertas de stock bajo
 
 ### Fase 3 - Pedidos y Entregas (Semana 4-5)
 - [ ] Creacion y asignacion de pedidos

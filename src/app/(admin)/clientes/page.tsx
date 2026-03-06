@@ -1,6 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { listarClientes } from "@/actions/clientes";
+import { TablaClientes } from "@/components/admin/clientes/tabla-clientes";
 
-export default function ClientesPage() {
+export default async function ClientesPage() {
+  const resultado = await listarClientes();
+  const clientes = resultado.data ?? [];
+
   return (
     <div className="space-y-6">
       <div>
@@ -9,16 +13,7 @@ export default function ClientesPage() {
           Gestion de clientes y sus datos
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Listado de Clientes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-[#64748B]">
-            Conecte la base de datos para ver los clientes.
-          </p>
-        </CardContent>
-      </Card>
+      <TablaClientes clientesIniciales={clientes} />
     </div>
   );
 }
