@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil, Plus, Search, UserCheck, UserX } from "lucide-react";
+import Link from "next/link";
+import { Eye, Pencil, Plus, Search, UserCheck, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -93,7 +94,9 @@ export function CouriersTable({ initialCouriers }: CouriersTableProps) {
               filtered.map((courier) => (
                 <TableRow key={courier.id} className={!courier.active ? "opacity-50" : ""}>
                   <TableCell className="font-medium text-[#1E293B]">
-                    {courier.name}
+                    <Link href={`/couriers/${courier.id}`} className="hover:text-[#3B82F6] hover:underline">
+                      {courier.name}
+                    </Link>
                   </TableCell>
                   <TableCell className="text-[#64748B]">
                     {courier.email}
@@ -111,6 +114,13 @@ export function CouriersTable({ initialCouriers }: CouriersTableProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Link
+                        href={`/couriers/${courier.id}`}
+                        className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#1E3A5F]"
+                        title="Ver detalle"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Link>
                       <button
                         onClick={() => handleEdit(courier)}
                         className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"

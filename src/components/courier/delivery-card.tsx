@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { markInTransit } from "@/actions/orders";
 import { ConfirmDeliveryDialog } from "./confirm-delivery-dialog";
-import { CourierPaymentDialog } from "./courier-payment-dialog";
 import type { Order } from "@/types";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -24,12 +23,15 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function DeliveryCard({ order }: { order: Order }) {
+interface DeliveryCardProps {
+  order: Order;
+  onDeliveryConfirmed: (deliveredTotal: number) => void;
+}
+
+export function DeliveryCard({ order, onDeliveryConfirmed }: DeliveryCardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [deliveredTotal, setDeliveredTotal] = useState(order.total);
   const [error, setError] = useState("");
   const config = statusConfig[order.status] || statusConfig.assigned;
 
@@ -46,9 +48,8 @@ export function DeliveryCard({ order }: { order: Order }) {
   }
 
   function handleDelivered(total: number) {
-    setDeliveredTotal(total);
     setShowConfirm(false);
-    setShowPayment(true);
+    onDeliveryConfirmed(total);
   }
 
   return (
@@ -144,13 +145,6 @@ export function DeliveryCard({ order }: { order: Order }) {
         onClose={() => setShowConfirm(false)}
         onDelivered={handleDelivered}
         order={order}
-      />
-
-      <CourierPaymentDialog
-        open={showPayment}
-        onClose={() => { setShowPayment(false); router.refresh(); }}
-        order={order}
-        deliveredTotal={deliveredTotal}
       />
     </>
   );

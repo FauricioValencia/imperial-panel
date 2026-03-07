@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,7 +35,6 @@ export function ConfirmDeliveryDialog({
   onDelivered,
   order,
 }: ConfirmDeliveryDialogProps) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -106,7 +104,8 @@ export function ConfirmDeliveryDialog({
 
       if (result.success) {
         onDelivered(deliveredTotal);
-        router.refresh();
+        // Don't refresh here — the payment dialog needs to show first.
+        // Refresh happens when the payment dialog closes.
       } else {
         setError(result.error || "Error al confirmar entrega");
       }
