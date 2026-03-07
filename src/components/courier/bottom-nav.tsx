@@ -8,7 +8,7 @@ const tabs = [
   { label: "Entregas", href: "/deliveries", icon: Package },
   { label: "Ruta", href: "/route", icon: MapPin },
   { label: "Historial", href: "/history", icon: Clock },
-  { label: "Perfil", href: "/history", icon: User },
+  { label: "Perfil", href: "/profile", icon: User },
 ];
 
 export function BottomNav() {

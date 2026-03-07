@@ -179,6 +179,7 @@ export async function registerStockEntry(
     return { success: false, error: result.error.issues[0].message };
   }
 
+  // Get product info for logging
   const { data: product } = await ctx.supabase
     .from("products")
     .select("stock, name")
@@ -189,29 +190,18 @@ export async function registerStockEntry(
     return { success: false, error: "Product not found" };
   }
 
-  const newStock = product.stock + result.data.quantity;
+  const previousStock = product.stock;
 
-  const { error: updateError } = await ctx.supabase
-    .from("products")
-    .update({ stock: newStock })
-    .eq("id", result.data.product_id);
+  // Atomic stock increment + movement insert via RPC
+  const { error: stockError } = await ctx.supabase.rpc("inbound_stock", {
+    p_product_id: result.data.product_id,
+    p_quantity: result.data.quantity,
+    p_notes: result.data.notes || "Manual stock entry",
+  });
 
-  if (updateError) {
-    logError("register_stock_entry", updateError);
+  if (stockError) {
+    logError("register_stock_entry", stockError);
     return { success: false, error: "Error updating stock" };
-  }
-
-  const { error: movError } = await ctx.supabase
-    .from("inventory_movements")
-    .insert({
-      product_id: result.data.product_id,
-      type: "inbound",
-      quantity: result.data.quantity,
-      notes: result.data.notes || "Manual stock entry",
-    });
-
-  if (movError) {
-    logError("register_movement_entry", movError);
   }
 
   logOperacion(
@@ -220,8 +210,8 @@ export async function registerStockEntry(
       product_id: result.data.product_id,
       product_name: product.name,
       quantity: result.data.quantity,
-      previous_stock: product.stock,
-      new_stock: newStock,
+      previous_stock: previousStock,
+      new_stock: previousStock + result.data.quantity,
     },
     ctx.user.id
   );

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Wallet,
   Package,
+  ClipboardList,
   FileBarChart,
   Users,
   Bike,
@@ -29,6 +30,7 @@ import type { User } from "@/types";
 const navigation = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Cartera", href: "/billing", icon: Wallet },
+  { label: "Pedidos", href: "/orders", icon: ClipboardList },
   { label: "Inventario", href: "/inventory", icon: Package },
   { label: "Clientes", href: "/customers", icon: Users },
   { label: "Domiciliarios", href: "/couriers", icon: Bike },

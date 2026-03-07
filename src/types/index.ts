@@ -180,7 +180,7 @@ export interface Payment {
   customer_id: string;
   amount: number;
   type: PaymentType;
-  payment_method: string;
+  payment_method: PaymentMethod;
   registered_by: string;
   created_at: string;
 }
@@ -202,7 +202,7 @@ export interface CashClosing {
   reported_total: number;
   system_total: number;
   difference: number;
-  status: string;
+  status: (typeof CLOSING_STATUS)[number];
   notes: string | null;
   created_at: string;
 }
