@@ -21,56 +21,56 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FormularioCliente } from "./formulario-cliente";
-import { desactivarCliente } from "@/actions/clientes";
-import type { Cliente } from "@/types";
+import { CustomerForm } from "./customer-form";
+import { deactivateCustomer } from "@/actions/customers";
+import type { Customer } from "@/types";
 
-function formatearMoneda(valor: number): string {
+function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
     minimumFractionDigits: 0,
-  }).format(valor);
+  }).format(value);
 }
 
-interface TablaClientesProps {
-  clientesIniciales: Cliente[];
+interface CustomersTableProps {
+  initialCustomers: Customer[];
 }
 
-export function TablaClientes({ clientesIniciales }: TablaClientesProps) {
-  const [busqueda, setBusqueda] = useState("");
-  const [formularioAbierto, setFormularioAbierto] = useState(false);
-  const [clienteEditar, setClienteEditar] = useState<Cliente | null>(null);
-  const [clienteEliminar, setClienteEliminar] = useState<Cliente | null>(null);
+export function CustomersTable({ initialCustomers }: CustomersTableProps) {
+  const [search, setSearch] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const clientesFiltrados = clientesIniciales.filter((c) => {
-    const termino = busqueda.toLowerCase();
+  const filtered = initialCustomers.filter((c) => {
+    const term = search.toLowerCase();
     return (
-      c.nombre.toLowerCase().includes(termino) ||
-      c.telefono?.toLowerCase().includes(termino) ||
-      c.direccion?.toLowerCase().includes(termino)
+      c.name.toLowerCase().includes(term) ||
+      c.phone?.toLowerCase().includes(term) ||
+      c.address?.toLowerCase().includes(term)
     );
   });
 
-  function handleEditar(cliente: Cliente) {
-    setClienteEditar(cliente);
-    setFormularioAbierto(true);
+  function handleEdit(customer: Customer) {
+    setEditingCustomer(customer);
+    setFormOpen(true);
   }
 
-  function handleNuevo() {
-    setClienteEditar(null);
-    setFormularioAbierto(true);
+  function handleNew() {
+    setEditingCustomer(null);
+    setFormOpen(true);
   }
 
-  function handleDesactivar() {
-    if (!clienteEliminar) return;
+  function handleDeactivate() {
+    if (!deletingCustomer) return;
     startTransition(async () => {
-      const resultado = await desactivarCliente(clienteEliminar.id);
-      if (!resultado.success) {
-        alert(resultado.error);
+      const result = await deactivateCustomer(deletingCustomer.id);
+      if (!result.success) {
+        alert(result.error);
       }
-      setClienteEliminar(null);
+      setDeletingCustomer(null);
     });
   }
 
@@ -81,12 +81,12 @@ export function TablaClientes({ clientesIniciales }: TablaClientesProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <Input
             placeholder="Buscar por nombre, telefono o direccion..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-        <Button onClick={handleNuevo} className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
+        <Button onClick={handleNew} className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Cliente
         </Button>
@@ -104,46 +104,46 @@ export function TablaClientes({ clientesIniciales }: TablaClientesProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clientesFiltrados.length === 0 ? (
+            {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-[#64748B]">
-                  {busqueda ? "No se encontraron clientes" : "No hay clientes registrados"}
+                  {search ? "No se encontraron clientes" : "No hay clientes registrados"}
                 </TableCell>
               </TableRow>
             ) : (
-              clientesFiltrados.map((cliente) => (
-                <TableRow key={cliente.id}>
+              filtered.map((customer) => (
+                <TableRow key={customer.id}>
                   <TableCell className="font-medium text-[#1E293B]">
-                    {cliente.nombre}
+                    {customer.name}
                   </TableCell>
                   <TableCell className="text-[#64748B]">
-                    {cliente.telefono || "—"}
+                    {customer.phone || "—"}
                   </TableCell>
                   <TableCell className="text-[#64748B] max-w-[200px] truncate">
-                    {cliente.direccion || "—"}
+                    {customer.address || "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {cliente.saldo_pendiente > 0 ? (
+                    {customer.pending_balance > 0 ? (
                       <Badge variant="destructive" className="bg-[#EF4444]">
-                        {formatearMoneda(cliente.saldo_pendiente)}
+                        {formatCurrency(customer.pending_balance)}
                       </Badge>
                     ) : (
                       <span className="text-[#10B981] font-medium">
-                        {formatearMoneda(0)}
+                        {formatCurrency(0)}
                       </span>
                     )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => handleEditar(cliente)}
+                        onClick={() => handleEdit(customer)}
                         className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
                         title="Editar"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => setClienteEliminar(cliente)}
+                        onClick={() => setDeletingCustomer(customer)}
                         className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#EF4444]"
                         title="Desactivar"
                       >
@@ -158,26 +158,26 @@ export function TablaClientes({ clientesIniciales }: TablaClientesProps) {
         </Table>
       </div>
 
-      <FormularioCliente
-        abierto={formularioAbierto}
-        onCerrar={() => setFormularioAbierto(false)}
-        cliente={clienteEditar}
+      <CustomerForm
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        customer={editingCustomer}
       />
 
-      <Dialog open={!!clienteEliminar} onOpenChange={(open) => !open && setClienteEliminar(null)}>
+      <Dialog open={!!deletingCustomer} onOpenChange={(open) => !open && setDeletingCustomer(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Desactivar Cliente</DialogTitle>
             <DialogDescription>
-              Se desactivara el cliente <strong>{clienteEliminar?.nombre}</strong>.
+              Se desactivara el cliente <strong>{deletingCustomer?.name}</strong>.
               Esta accion no elimina los datos, solo oculta al cliente del sistema.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setClienteEliminar(null)} disabled={isPending}>
+            <Button variant="outline" onClick={() => setDeletingCustomer(null)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDesactivar} disabled={isPending}>
+            <Button variant="destructive" onClick={handleDeactivate} disabled={isPending}>
               {isPending ? "Desactivando..." : "Desactivar"}
             </Button>
           </DialogFooter>

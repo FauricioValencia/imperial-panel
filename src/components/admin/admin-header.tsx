@@ -12,18 +12,18 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-const titulos: Record<string, string> = {
+const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/cartera": "Cartera",
-  "/inventario": "Inventario",
-  "/clientes": "Clientes",
-  "/domiciliarios": "Domiciliarios",
-  "/reportes": "Reportes",
+  "/billing": "Cartera",
+  "/inventory": "Inventario",
+  "/customers": "Clientes",
+  "/couriers": "Domiciliarios",
+  "/reports": "Reportes",
 };
 
 export function AdminHeader() {
   const pathname = usePathname();
-  const tituloActual = titulos[pathname] || "Imperial";
+  const currentTitle = titles[pathname] || "Imperial";
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4">
@@ -39,7 +39,7 @@ export function AdminHeader() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbPage className="text-[#1E293B] font-medium">
-              {tituloActual}
+              {currentTitle}
             </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { crearProducto, editarProducto } from "@/actions/inventario";
+import { createProduct, updateProduct } from "@/actions/inventory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,63 +12,63 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { ActionResponse, Producto } from "@/types";
+import type { ActionResponse, Product } from "@/types";
 
-const estadoInicial: ActionResponse = { success: false };
+const initialState: ActionResponse = { success: false };
 
-interface FormularioProductoProps {
-  abierto: boolean;
-  onCerrar: () => void;
-  producto?: Producto | null;
+interface ProductFormProps {
+  open: boolean;
+  onClose: () => void;
+  product?: Product | null;
 }
 
-export function FormularioProducto({ abierto, onCerrar, producto }: FormularioProductoProps) {
-  const esEdicion = !!producto;
-  const actionFn = esEdicion
-    ? editarProducto.bind(null, producto.id)
-    : crearProducto;
+export function ProductForm({ open, onClose, product }: ProductFormProps) {
+  const isEditing = !!product;
+  const actionFn = isEditing
+    ? updateProduct.bind(null, product.id)
+    : createProduct;
 
-  const [estado, formAction, isPending] = useActionState(actionFn, estadoInicial);
+  const [state, formAction, isPending] = useActionState(actionFn, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (estado.success) {
-      onCerrar();
+    if (state.success) {
+      onClose();
     }
-  }, [estado.success, onCerrar]);
+  }, [state.success, onClose]);
 
   return (
-    <Dialog open={abierto} onOpenChange={(open) => !open && onCerrar()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">
-            {esEdicion ? "Editar Producto" : "Nuevo Producto"}
+            {isEditing ? "Editar Producto" : "Nuevo Producto"}
           </DialogTitle>
         </DialogHeader>
         <form ref={formRef} action={formAction} className="space-y-4">
-          {estado.error && (
+          {state.error && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {estado.error}
+              {state.error}
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre *</Label>
+            <Label htmlFor="name">Nombre *</Label>
             <Input
-              id="nombre"
-              name="nombre"
+              id="name"
+              name="name"
               required
-              defaultValue={producto?.nombre ?? ""}
+              defaultValue={product?.name ?? ""}
               disabled={isPending}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripcion</Label>
+            <Label htmlFor="description">Descripcion</Label>
             <Textarea
-              id="descripcion"
-              name="descripcion"
-              defaultValue={producto?.descripcion ?? ""}
+              id="description"
+              name="description"
+              defaultValue={product?.description ?? ""}
               disabled={isPending}
               rows={2}
             />
@@ -76,20 +76,20 @@ export function FormularioProducto({ abierto, onCerrar, producto }: FormularioPr
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="precio">Precio *</Label>
+              <Label htmlFor="price">Precio *</Label>
               <Input
-                id="precio"
-                name="precio"
+                id="price"
+                name="price"
                 type="number"
                 min="0"
                 step="1"
                 required
-                defaultValue={producto?.precio ?? ""}
+                defaultValue={product?.price ?? ""}
                 disabled={isPending}
               />
             </div>
 
-            {!esEdicion && (
+            {!isEditing && (
               <div className="space-y-2">
                 <Label htmlFor="stock">Stock inicial</Label>
                 <Input
@@ -105,29 +105,29 @@ export function FormularioProducto({ abierto, onCerrar, producto }: FormularioPr
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="stock_minimo">Stock minimo</Label>
+              <Label htmlFor="min_stock">Stock minimo</Label>
               <Input
-                id="stock_minimo"
-                name="stock_minimo"
+                id="min_stock"
+                name="min_stock"
                 type="number"
                 min="0"
                 step="1"
-                defaultValue={producto?.stock_minimo ?? 5}
+                defaultValue={product?.min_stock ?? 5}
                 disabled={isPending}
               />
             </div>
           </div>
 
-          {esEdicion && (
-            <input type="hidden" name="stock" value={producto.stock} />
+          {isEditing && (
+            <input type="hidden" name="stock" value={product.stock} />
           )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onCerrar} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
               Cancelar
             </Button>
             <Button type="submit" className="bg-[#1E3A5F] hover:bg-[#2d4f7a]" disabled={isPending}>
-              {isPending ? "Guardando..." : esEdicion ? "Guardar cambios" : "Crear producto"}
+              {isPending ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear producto"}
             </Button>
           </div>
         </form>

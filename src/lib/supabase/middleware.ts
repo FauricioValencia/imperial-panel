@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function actualizarSesion(request: NextRequest) {
+export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -25,66 +25,29 @@ export async function actualizarSesion(request: NextRequest) {
     }
   );
 
+  // Only refresh session (tokens). No DB queries in middleware (Edge Runtime).
+  // Role verification is handled by the (admin) and (courier) layouts.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const publicRoutes = ["/login"];
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
-  // Rutas publicas que no requieren autenticacion
-  const rutasPublicas = ["/login"];
-  const esRutaPublica = rutasPublicas.some((ruta) => pathname.startsWith(ruta));
-
-  // Si no hay usuario y no es ruta publica, redirigir a login
-  if (!user && !esRutaPublica) {
+  // If no user and not a public route, redirect to login
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Si hay usuario y esta en login, redirigir segun rol
-  if (user && esRutaPublica) {
-    // Obtener rol del usuario desde la tabla usuarios
-    const { data: usuario } = await supabase
-      .from("usuarios")
-      .select("rol")
-      .eq("id", user.id)
-      .single();
-
+  // If authenticated user is on login, redirect to dashboard
+  // (the corresponding layout will handle role-based redirects)
+  if (user && isPublicRoute) {
     const url = request.nextUrl.clone();
-    if (usuario?.rol === "mensajero") {
-      url.pathname = "/entregas";
-    } else {
-      url.pathname = "/dashboard";
-    }
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
-  }
-
-  // Verificar acceso por rol a rutas protegidas
-  if (user) {
-    const { data: usuario } = await supabase
-      .from("usuarios")
-      .select("rol")
-      .eq("id", user.id)
-      .single();
-
-    const rutasAdmin = ["/dashboard", "/cartera", "/inventario", "/reportes", "/clientes", "/domiciliarios"];
-    const rutasMensajero = ["/entregas", "/ruta", "/historial"];
-
-    const esRutaAdmin = rutasAdmin.some((ruta) => pathname.startsWith(ruta));
-    const esRutaMensajero = rutasMensajero.some((ruta) => pathname.startsWith(ruta));
-
-    if (esRutaAdmin && usuario?.rol !== "admin") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/entregas";
-      return NextResponse.redirect(url);
-    }
-
-    if (esRutaMensajero && usuario?.rol !== "mensajero") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
   }
 
   return supabaseResponse;

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function crearClienteSupabaseServer() {
+export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -18,8 +18,8 @@ export async function crearClienteSupabaseServer() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // setAll es llamado desde Server Components donde no se puede escribir cookies.
-            // Se ignora silenciosamente. El middleware se encarga del refresh.
+            // setAll is called from Server Components where cookies can't be written.
+            // Silently ignored. The middleware handles token refresh.
           }
         },
       },

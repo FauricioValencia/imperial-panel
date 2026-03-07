@@ -17,75 +17,82 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { listarMovimientos } from "@/actions/inventario";
-import type { MovimientoInventario, TipoMovimiento } from "@/types";
+import { listMovements } from "@/actions/inventory";
+import type { InventoryMovement, MovementType } from "@/types";
 
-const iconosPorTipo: Record<TipoMovimiento, typeof ArrowDownCircle> = {
-  entrada: ArrowDownCircle,
-  salida: ArrowUpCircle,
-  devolucion: RotateCcw,
-  ajuste: Settings2,
+const iconsByType: Record<MovementType, typeof ArrowDownCircle> = {
+  inbound: ArrowDownCircle,
+  outbound: ArrowUpCircle,
+  return: RotateCcw,
+  adjustment: Settings2,
 };
 
-const coloresPorTipo: Record<TipoMovimiento, string> = {
-  entrada: "bg-emerald-100 text-emerald-700",
-  salida: "bg-red-100 text-red-700",
-  devolucion: "bg-blue-100 text-blue-700",
-  ajuste: "bg-amber-100 text-amber-700",
+const colorsByType: Record<MovementType, string> = {
+  inbound: "bg-emerald-100 text-emerald-700",
+  outbound: "bg-red-100 text-red-700",
+  return: "bg-blue-100 text-blue-700",
+  adjustment: "bg-amber-100 text-amber-700",
 };
 
-function formatearFecha(fecha: string): string {
+const labelsByType: Record<MovementType, string> = {
+  inbound: "Entrada",
+  outbound: "Salida",
+  return: "Devolucion",
+  adjustment: "Ajuste",
+};
+
+function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(fecha));
+  }).format(new Date(date));
 }
 
-interface HistorialMovimientosProps {
-  abierto: boolean;
-  onCerrar: () => void;
-  productoId: string | null;
-  productoNombre: string;
+interface MovementHistoryProps {
+  open: boolean;
+  onClose: () => void;
+  productId: string | null;
+  productName: string;
 }
 
-export function HistorialMovimientos({
-  abierto,
-  onCerrar,
-  productoId,
-  productoNombre,
-}: HistorialMovimientosProps) {
-  const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([]);
-  const [cargando, setCargando] = useState(false);
+export function MovementHistory({
+  open,
+  onClose,
+  productId,
+  productName,
+}: MovementHistoryProps) {
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (abierto && productoId) {
-      setCargando(true);
-      listarMovimientos(productoId).then((res) => {
+    if (open && productId) {
+      setLoading(true);
+      listMovements(productId).then((res) => {
         if (res.success && res.data) {
-          setMovimientos(res.data);
+          setMovements(res.data);
         }
-        setCargando(false);
+        setLoading(false);
       });
     }
-  }, [abierto, productoId]);
+  }, [open, productId]);
 
   return (
-    <Dialog open={abierto} onOpenChange={(open) => !open && onCerrar()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">
-            Movimientos - {productoNombre}
+            Movimientos - {productName}
           </DialogTitle>
         </DialogHeader>
 
-        {cargando ? (
+        {loading ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-sm text-[#64748B]">Cargando movimientos...</p>
           </div>
-        ) : movimientos.length === 0 ? (
+        ) : movements.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-sm text-[#64748B]">No hay movimientos registrados</p>
           </div>
@@ -101,25 +108,26 @@ export function HistorialMovimientos({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movimientos.map((mov) => {
-                  const Icono = iconosPorTipo[mov.tipo as TipoMovimiento];
-                  const color = coloresPorTipo[mov.tipo as TipoMovimiento];
+                {movements.map((mov) => {
+                  const Icon = iconsByType[mov.type as MovementType];
+                  const color = colorsByType[mov.type as MovementType];
+                  const label = labelsByType[mov.type as MovementType];
                   return (
                     <TableRow key={mov.id}>
                       <TableCell>
                         <Badge variant="secondary" className={color}>
-                          <Icono className="mr-1 h-3 w-3" />
-                          {mov.tipo}
+                          <Icon className="mr-1 h-3 w-3" />
+                          {label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {mov.tipo === "salida" ? "-" : "+"}{mov.cantidad}
+                        {mov.type === "outbound" ? "-" : "+"}{mov.quantity}
                       </TableCell>
                       <TableCell className="text-[#64748B] max-w-[200px] truncate">
-                        {mov.notas || "—"}
+                        {mov.notes || "—"}
                       </TableCell>
                       <TableCell className="text-[#64748B] text-sm">
-                        {formatearFecha(mov.created_at)}
+                        {formatDate(mov.created_at)}
                       </TableCell>
                     </TableRow>
                   );

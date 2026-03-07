@@ -35,73 +35,73 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FormularioProducto } from "./formulario-producto";
-import { DialogoEntrada } from "./dialogo-entrada";
-import { HistorialMovimientos } from "./historial-movimientos";
-import { desactivarProducto } from "@/actions/inventario";
-import type { Producto } from "@/types";
+import { ProductForm } from "./product-form";
+import { StockEntryDialog } from "./stock-entry-dialog";
+import { MovementHistory } from "./movement-history";
+import { deactivateProduct } from "@/actions/inventory";
+import type { Product } from "@/types";
 
-function formatearMoneda(valor: number): string {
+function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
     minimumFractionDigits: 0,
-  }).format(valor);
+  }).format(value);
 }
 
-interface TablaProductosProps {
-  productosIniciales: Producto[];
+interface ProductsTableProps {
+  initialProducts: Product[];
 }
 
-export function TablaProductos({ productosIniciales }: TablaProductosProps) {
-  const [busqueda, setBusqueda] = useState("");
-  const [formularioAbierto, setFormularioAbierto] = useState(false);
-  const [productoEditar, setProductoEditar] = useState<Producto | null>(null);
-  const [productoEliminar, setProductoEliminar] = useState<Producto | null>(null);
-  const [productoEntrada, setProductoEntrada] = useState<Producto | null>(null);
-  const [historial, setHistorial] = useState<{ id: string; nombre: string } | null>(null);
+export function ProductsTable({ initialProducts }: ProductsTableProps) {
+  const [search, setSearch] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [entryProduct, setEntryProduct] = useState<Product | null>(null);
+  const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const productosFiltrados = productosIniciales.filter((p) => {
-    const termino = busqueda.toLowerCase();
+  const filtered = initialProducts.filter((p) => {
+    const term = search.toLowerCase();
     return (
-      p.nombre.toLowerCase().includes(termino) ||
-      p.descripcion?.toLowerCase().includes(termino)
+      p.name.toLowerCase().includes(term) ||
+      p.description?.toLowerCase().includes(term)
     );
   });
 
-  const productosStockBajo = productosIniciales.filter(
-    (p) => p.stock <= p.stock_minimo
+  const lowStockCount = initialProducts.filter(
+    (p) => p.stock <= p.min_stock
   ).length;
 
-  function handleEditar(producto: Producto) {
-    setProductoEditar(producto);
-    setFormularioAbierto(true);
+  function handleEdit(product: Product) {
+    setEditingProduct(product);
+    setFormOpen(true);
   }
 
-  function handleNuevo() {
-    setProductoEditar(null);
-    setFormularioAbierto(true);
+  function handleNew() {
+    setEditingProduct(null);
+    setFormOpen(true);
   }
 
-  function handleDesactivar() {
-    if (!productoEliminar) return;
+  function handleDeactivate() {
+    if (!deletingProduct) return;
     startTransition(async () => {
-      const resultado = await desactivarProducto(productoEliminar.id);
-      if (!resultado.success) {
-        alert(resultado.error);
+      const result = await deactivateProduct(deletingProduct.id);
+      if (!result.success) {
+        alert(result.error);
       }
-      setProductoEliminar(null);
+      setDeletingProduct(null);
     });
   }
 
   return (
     <>
-      {productosStockBajo > 0 && (
+      {lowStockCount > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
           <p className="text-sm text-amber-800">
-            <strong>{productosStockBajo}</strong> producto{productosStockBajo > 1 ? "s" : ""} con stock bajo o agotado
+            <strong>{lowStockCount}</strong> producto{lowStockCount > 1 ? "s" : ""} con stock bajo o agotado
           </p>
         </div>
       )}
@@ -111,12 +111,12 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <Input
             placeholder="Buscar por nombre o descripcion..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-        <Button onClick={handleNuevo} className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
+        <Button onClick={handleNew} className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Producto
         </Button>
@@ -134,39 +134,39 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {productosFiltrados.length === 0 ? (
+            {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-[#64748B]">
-                  {busqueda ? "No se encontraron productos" : "No hay productos registrados"}
+                  {search ? "No se encontraron productos" : "No hay productos registrados"}
                 </TableCell>
               </TableRow>
             ) : (
-              productosFiltrados.map((producto) => {
-                const stockBajo = producto.stock <= producto.stock_minimo;
-                const agotado = producto.stock === 0;
+              filtered.map((product) => {
+                const lowStock = product.stock <= product.min_stock;
+                const outOfStock = product.stock === 0;
 
                 return (
-                  <TableRow key={producto.id}>
+                  <TableRow key={product.id}>
                     <TableCell className="font-medium text-[#1E293B]">
-                      {producto.nombre}
+                      {product.name}
                     </TableCell>
                     <TableCell className="text-[#64748B] max-w-[200px] truncate">
-                      {producto.descripcion || "—"}
+                      {product.description || "—"}
                     </TableCell>
                     <TableCell className="text-right text-[#1E293B]">
-                      {formatearMoneda(producto.precio)}
+                      {formatCurrency(product.price)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {agotado ? (
+                      {outOfStock ? (
                         <Badge variant="destructive" className="bg-[#EF4444]">
                           Agotado
                         </Badge>
-                      ) : stockBajo ? (
+                      ) : lowStock ? (
                         <Badge className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]">
-                          {producto.stock} (min: {producto.stock_minimo})
+                          {product.stock} (min: {product.min_stock})
                         </Badge>
                       ) : (
-                        <span className="text-[#10B981] font-medium">{producto.stock}</span>
+                        <span className="text-[#10B981] font-medium">{product.stock}</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -175,7 +175,7 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
-                                onClick={() => setProductoEntrada(producto)}
+                                onClick={() => setEntryProduct(product)}
                                 className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#10B981]"
                               >
                                 <PackagePlus className="h-4 w-4" />
@@ -187,7 +187,7 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
-                                onClick={() => setHistorial({ id: producto.id, nombre: producto.nombre })}
+                                onClick={() => setHistory({ id: product.id, name: product.name })}
                                 className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
                               >
                                 <History className="h-4 w-4" />
@@ -199,7 +199,7 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
-                                onClick={() => handleEditar(producto)}
+                                onClick={() => handleEdit(product)}
                                 className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
                               >
                                 <Pencil className="h-4 w-4" />
@@ -211,7 +211,7 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
-                                onClick={() => setProductoEliminar(producto)}
+                                onClick={() => setDeletingProduct(product)}
                                 className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#EF4444]"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -230,39 +230,39 @@ export function TablaProductos({ productosIniciales }: TablaProductosProps) {
         </Table>
       </div>
 
-      <FormularioProducto
-        abierto={formularioAbierto}
-        onCerrar={() => setFormularioAbierto(false)}
-        producto={productoEditar}
+      <ProductForm
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        product={editingProduct}
       />
 
-      <DialogoEntrada
-        abierto={!!productoEntrada}
-        onCerrar={() => setProductoEntrada(null)}
-        producto={productoEntrada}
+      <StockEntryDialog
+        open={!!entryProduct}
+        onClose={() => setEntryProduct(null)}
+        product={entryProduct}
       />
 
-      <HistorialMovimientos
-        abierto={!!historial}
-        onCerrar={() => setHistorial(null)}
-        productoId={historial?.id ?? null}
-        productoNombre={historial?.nombre ?? ""}
+      <MovementHistory
+        open={!!history}
+        onClose={() => setHistory(null)}
+        productId={history?.id ?? null}
+        productName={history?.name ?? ""}
       />
 
-      <Dialog open={!!productoEliminar} onOpenChange={(open) => !open && setProductoEliminar(null)}>
+      <Dialog open={!!deletingProduct} onOpenChange={(open) => !open && setDeletingProduct(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Desactivar Producto</DialogTitle>
             <DialogDescription>
-              Se desactivara el producto <strong>{productoEliminar?.nombre}</strong>.
+              Se desactivara el producto <strong>{deletingProduct?.name}</strong>.
               No aparecera en listados ni podra incluirse en nuevos pedidos.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProductoEliminar(null)} disabled={isPending}>
+            <Button variant="outline" onClick={() => setDeletingProduct(null)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDesactivar} disabled={isPending}>
+            <Button variant="destructive" onClick={handleDeactivate} disabled={isPending}>
               {isPending ? "Desactivando..." : "Desactivar"}
             </Button>
           </DialogFooter>

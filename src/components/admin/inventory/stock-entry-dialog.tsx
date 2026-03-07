@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { registrarEntradaInventario } from "@/actions/inventario";
+import { registerStockEntry } from "@/actions/inventory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,55 +12,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { ActionResponse, Producto } from "@/types";
+import type { ActionResponse, Product } from "@/types";
 
-const estadoInicial: ActionResponse = { success: false };
+const initialState: ActionResponse = { success: false };
 
-interface DialogoEntradaProps {
-  abierto: boolean;
-  onCerrar: () => void;
-  producto: Producto | null;
+interface StockEntryDialogProps {
+  open: boolean;
+  onClose: () => void;
+  product: Product | null;
 }
 
-export function DialogoEntrada({ abierto, onCerrar, producto }: DialogoEntradaProps) {
-  const [estado, formAction, isPending] = useActionState(registrarEntradaInventario, estadoInicial);
+export function StockEntryDialog({ open, onClose, product }: StockEntryDialogProps) {
+  const [state, formAction, isPending] = useActionState(registerStockEntry, initialState);
 
   useEffect(() => {
-    if (estado.success) {
-      onCerrar();
+    if (state.success) {
+      onClose();
     }
-  }, [estado.success, onCerrar]);
+  }, [state.success, onClose]);
 
-  if (!producto) return null;
+  if (!product) return null;
 
   return (
-    <Dialog open={abierto} onOpenChange={(open) => !open && onCerrar()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">
-            Registrar Entrada - {producto.nombre}
+            Registrar Entrada - {product.name}
           </DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
-          {estado.error && (
+          {state.error && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {estado.error}
+              {state.error}
             </div>
           )}
 
-          <input type="hidden" name="producto_id" value={producto.id} />
+          <input type="hidden" name="product_id" value={product.id} />
 
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-sm text-[#64748B]">
-              Stock actual: <span className="font-semibold text-[#1E293B]">{producto.stock}</span> unidades
+              Stock actual: <span className="font-semibold text-[#1E293B]">{product.stock}</span> unidades
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cantidad">Cantidad a ingresar *</Label>
+            <Label htmlFor="quantity">Cantidad a ingresar *</Label>
             <Input
-              id="cantidad"
-              name="cantidad"
+              id="quantity"
+              name="quantity"
               type="number"
               min="1"
               step="1"
@@ -70,10 +70,10 @@ export function DialogoEntrada({ abierto, onCerrar, producto }: DialogoEntradaPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notas">Notas</Label>
+            <Label htmlFor="notes">Notas</Label>
             <Textarea
-              id="notas"
-              name="notas"
+              id="notes"
+              name="notes"
               placeholder="Ej: Compra a proveedor X"
               disabled={isPending}
               rows={2}
@@ -81,7 +81,7 @@ export function DialogoEntrada({ abierto, onCerrar, producto }: DialogoEntradaPr
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onCerrar} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
               Cancelar
             </Button>
             <Button type="submit" className="bg-[#10B981] hover:bg-[#059669]" disabled={isPending}>

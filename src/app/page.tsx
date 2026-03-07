@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
-import { obtenerUsuarioActual } from "@/actions/auth";
+import { getCurrentUser } from "@/actions/auth";
 
 export default async function HomePage() {
-  const usuario = await obtenerUsuarioActual();
+  const user = await getCurrentUser();
 
-  if (!usuario) {
+  if (!user) {
     redirect("/login");
   }
 
-  if (usuario.rol === "mensajero") {
-    redirect("/entregas");
+  if (user.role === "courier") {
+    redirect("/deliveries");
   }
 
   redirect("/dashboard");

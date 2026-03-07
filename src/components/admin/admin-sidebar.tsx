@@ -9,7 +9,6 @@ import {
   FileBarChart,
   Users,
   Bike,
-  Settings,
   LogOut,
 } from "lucide-react";
 import {
@@ -24,19 +23,19 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { cerrarSesion } from "@/actions/auth";
-import type { Usuario } from "@/types";
+import { signOut } from "@/actions/auth";
+import type { User } from "@/types";
 
-const navegacion = [
-  { nombre: "Dashboard", href: "/dashboard", icono: LayoutDashboard },
-  { nombre: "Cartera", href: "/cartera", icono: Wallet },
-  { nombre: "Inventario", href: "/inventario", icono: Package },
-  { nombre: "Clientes", href: "/clientes", icono: Users },
-  { nombre: "Domiciliarios", href: "/domiciliarios", icono: Bike },
-  { nombre: "Reportes", href: "/reportes", icono: FileBarChart },
+const navigation = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Cartera", href: "/billing", icon: Wallet },
+  { label: "Inventario", href: "/inventory", icon: Package },
+  { label: "Clientes", href: "/customers", icon: Users },
+  { label: "Domiciliarios", href: "/couriers", icon: Bike },
+  { label: "Reportes", href: "/reports", icon: FileBarChart },
 ];
 
-export function AdminSidebar({ usuario }: { usuario: Usuario }) {
+export function AdminSidebar({ user }: { user: User }) {
   const pathname = usePathname();
 
   return (
@@ -58,22 +57,22 @@ export function AdminSidebar({ usuario }: { usuario: Usuario }) {
           <SidebarGroupLabel>Menu principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navegacion.map((item) => {
-                const activo = pathname.startsWith(item.href);
+              {navigation.map((item) => {
+                const active = pathname.startsWith(item.href);
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={activo}
+                      isActive={active}
                       className={
-                        activo
+                        active
                           ? "bg-[#1E3A5F]/10 text-[#1E3A5F] font-medium"
                           : "text-[#64748B] hover:text-[#1E293B]"
                       }
                     >
                       <Link href={item.href}>
-                        <item.icono className="h-4 w-4" />
-                        <span>{item.nombre}</span>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -87,15 +86,15 @@ export function AdminSidebar({ usuario }: { usuario: Usuario }) {
       <SidebarFooter className="border-t border-slate-200 p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1E3A5F] text-xs font-medium text-white">
-            {usuario.nombre.charAt(0).toUpperCase()}
+            {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="truncate text-sm font-medium text-[#1E293B]">
-              {usuario.nombre}
+              {user.name}
             </p>
-            <p className="truncate text-xs text-[#64748B]">{usuario.email}</p>
+            <p className="truncate text-xs text-[#64748B]">{user.email}</p>
           </div>
-          <form action={cerrarSesion}>
+          <form action={signOut}>
             <button
               type="submit"
               className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#1E293B]"

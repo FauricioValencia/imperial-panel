@@ -1,17 +1,17 @@
 "use client";
 
 import { useActionState } from "react";
-import { iniciarSesion } from "@/actions/auth";
+import { signIn } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { ActionResponse } from "@/types";
 
-const estadoInicial: ActionResponse = { success: false };
+const initialState: ActionResponse = { success: false };
 
 export default function LoginPage() {
-  const [estado, formAction, isPending] = useActionState(iniciarSesion, estadoInicial);
+  const [state, formAction, isPending] = useActionState(signIn, initialState);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
@@ -29,9 +29,9 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
-            {estado.error && (
+            {state.error && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {estado.error}
+                {state.error}
               </div>
             )}
 

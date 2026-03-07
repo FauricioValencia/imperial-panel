@@ -2,26 +2,26 @@ import { redirect } from "next/navigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminHeader } from "@/components/admin/admin-header";
-import { obtenerUsuarioActual } from "@/actions/auth";
+import { getCurrentUser } from "@/actions/auth";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const usuario = await obtenerUsuarioActual();
+  const user = await getCurrentUser();
 
-  if (!usuario) {
+  if (!user) {
     redirect("/login");
   }
 
-  if (usuario.rol !== "admin") {
-    redirect("/entregas");
+  if (user.role !== "admin") {
+    redirect("/deliveries");
   }
 
   return (
     <SidebarProvider>
-      <AdminSidebar usuario={usuario} />
+      <AdminSidebar user={user} />
       <SidebarInset>
         <AdminHeader />
         <main className="flex-1 overflow-auto bg-slate-50 p-6">

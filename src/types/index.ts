@@ -4,224 +4,222 @@ import { z } from "zod";
 // Enums
 // ============================================
 
-export const ROL_USUARIO = ["admin", "mensajero"] as const;
-export const ESTADO_PEDIDO = [
-  "pendiente",
-  "asignado",
-  "en_camino",
-  "entregado",
-  "devuelto",
-  "parcial",
+export const USER_ROLE = ["admin", "courier"] as const;
+export const ORDER_STATUS = [
+  "pending",
+  "assigned",
+  "in_transit",
+  "delivered",
+  "returned",
+  "partial",
 ] as const;
-export const TIPO_PAGO = ["completo", "abono"] as const;
-export const METODO_PAGO = ["efectivo", "transferencia", "nequi", "daviplata"] as const;
-export const TIPO_MOVIMIENTO = ["entrada", "salida", "devolucion", "ajuste"] as const;
-export const ESTADO_CIERRE = ["pendiente", "aprobado", "con_diferencia"] as const;
-export const ACCION_AUDIT = ["INSERT", "UPDATE", "DELETE"] as const;
+export const PAYMENT_TYPE = ["full", "partial"] as const;
+export const PAYMENT_METHOD = ["cash", "transfer", "nequi", "daviplata"] as const;
+export const MOVEMENT_TYPE = ["inbound", "outbound", "return", "adjustment"] as const;
+export const CLOSING_STATUS = ["pending", "approved", "with_difference"] as const;
+export const AUDIT_ACTION = ["INSERT", "UPDATE", "DELETE"] as const;
 
 // ============================================
-// Schemas Zod
+// Zod Schemas
 // ============================================
 
 export const loginSchema = z.object({
-  email: z.string().email("Email invalido"),
-  password: z.string().min(6, "Minimo 6 caracteres"),
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Minimum 6 characters"),
 });
 
-export const clienteSchema = z.object({
-  nombre: z.string().min(2, "Nombre requerido"),
-  telefono: z.string().optional(),
-  direccion: z.string().optional(),
+export const customerSchema = z.object({
+  name: z.string().min(2, "Name required"),
+  phone: z.string().optional(),
+  address: z.string().optional(),
 });
 
-export const productoSchema = z.object({
-  nombre: z.string().min(2, "Nombre requerido"),
-  descripcion: z.string().optional(),
-  precio: z.number().positive("Precio debe ser positivo"),
-  stock: z.number().int().min(0, "Stock no puede ser negativo"),
-  stock_minimo: z.number().int().min(0).default(5),
+export const productSchema = z.object({
+  name: z.string().min(2, "Name required"),
+  description: z.string().optional(),
+  price: z.number().positive("Price must be positive"),
+  stock: z.number().int().min(0, "Stock cannot be negative"),
+  min_stock: z.number().int().min(0).default(5),
 });
 
-export const pedidoItemSchema = z.object({
-  producto_id: z.string().uuid(),
-  cantidad: z.number().int().positive("Cantidad debe ser positiva"),
-  precio_unitario: z.number().positive(),
+export const orderItemSchema = z.object({
+  product_id: z.string().uuid(),
+  quantity: z.number().int().positive("Quantity must be positive"),
+  unit_price: z.number().positive(),
 });
 
-export const crearPedidoSchema = z.object({
-  cliente_id: z.string().uuid(),
-  items: z.array(pedidoItemSchema).min(1, "Debe tener al menos un item"),
-  notas: z.string().optional(),
+export const createOrderSchema = z.object({
+  customer_id: z.string().uuid(),
+  items: z.array(orderItemSchema).min(1, "Must have at least one item"),
+  notes: z.string().optional(),
 });
 
-export const asignarMensajeroSchema = z.object({
-  pedido_id: z.string().uuid(),
-  mensajero_id: z.string().uuid(),
+export const assignCourierSchema = z.object({
+  order_id: z.string().uuid(),
+  courier_id: z.string().uuid(),
 });
 
-export const registrarPagoSchema = z.object({
-  pedido_id: z.string().uuid(),
-  monto: z.number().positive("Monto debe ser positivo"),
-  tipo: z.enum(TIPO_PAGO),
-  metodo_pago: z.enum(METODO_PAGO).default("efectivo"),
+export const registerPaymentSchema = z.object({
+  order_id: z.string().uuid(),
+  amount: z.number().positive("Amount must be positive"),
+  type: z.enum(PAYMENT_TYPE),
+  payment_method: z.enum(PAYMENT_METHOD).default("cash"),
 });
 
-export const confirmarEntregaSchema = z.object({
-  pedido_id: z.string().uuid(),
-  items_devueltos: z
+export const confirmDeliverySchema = z.object({
+  order_id: z.string().uuid(),
+  returned_items: z
     .array(
       z.object({
-        pedido_item_id: z.string().uuid(),
-        cantidad_devuelta: z.number().int().positive(),
+        order_item_id: z.string().uuid(),
+        returned_quantity: z.number().int().positive(),
       })
     )
     .optional(),
 });
 
-export const cierreCajaSchema = z.object({
-  total_reportado: z.number().min(0),
-  notas: z.string().optional(),
+export const cashClosingSchema = z.object({
+  reported_total: z.number().min(0),
+  notes: z.string().optional(),
 });
 
-export const configuracionNegocioSchema = z.object({
-  nombre_empresa: z.string().min(2),
-  nit: z.string().optional(),
-  telefono: z.string().optional(),
-  direccion: z.string().optional(),
-  condiciones_pago: z.string().optional(),
+export const businessConfigSchema = z.object({
+  company_name: z.string().min(2),
+  tax_id: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  payment_terms: z.string().optional(),
   logo_url: z.string().url().optional(),
 });
 
 // ============================================
-// Types inferidos de Zod
+// Inferred types from Zod
 // ============================================
 
 export type LoginInput = z.infer<typeof loginSchema>;
-export type ClienteInput = z.infer<typeof clienteSchema>;
-export type ProductoInput = z.infer<typeof productoSchema>;
-export type CrearPedidoInput = z.infer<typeof crearPedidoSchema>;
-export type AsignarMensajeroInput = z.infer<typeof asignarMensajeroSchema>;
-export type RegistrarPagoInput = z.infer<typeof registrarPagoSchema>;
-export type ConfirmarEntregaInput = z.infer<typeof confirmarEntregaSchema>;
-export type CierreCajaInput = z.infer<typeof cierreCajaSchema>;
-export type ConfiguracionNegocioInput = z.infer<typeof configuracionNegocioSchema>;
+export type CustomerInput = z.infer<typeof customerSchema>;
+export type ProductInput = z.infer<typeof productSchema>;
+export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
+export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
+export type ConfirmDeliveryInput = z.infer<typeof confirmDeliverySchema>;
+export type CashClosingInput = z.infer<typeof cashClosingSchema>;
+export type BusinessConfigInput = z.infer<typeof businessConfigSchema>;
 
 // ============================================
-// Types de base de datos
+// Database types
 // ============================================
 
-export type RolUsuario = (typeof ROL_USUARIO)[number];
-export type EstadoPedido = (typeof ESTADO_PEDIDO)[number];
-export type TipoPago = (typeof TIPO_PAGO)[number];
-export type MetodoPago = (typeof METODO_PAGO)[number];
-export type TipoMovimiento = (typeof TIPO_MOVIMIENTO)[number];
+export type UserRole = (typeof USER_ROLE)[number];
+export type OrderStatus = (typeof ORDER_STATUS)[number];
+export type PaymentType = (typeof PAYMENT_TYPE)[number];
+export type PaymentMethod = (typeof PAYMENT_METHOD)[number];
+export type MovementType = (typeof MOVEMENT_TYPE)[number];
 
-export interface Usuario {
+export interface User {
   id: string;
   email: string;
-  nombre: string;
-  rol: RolUsuario;
-  activo: boolean;
+  name: string;
+  role: UserRole;
+  active: boolean;
   created_at: string;
 }
 
-export interface Cliente {
+export interface Customer {
   id: string;
-  nombre: string;
-  telefono: string | null;
-  direccion: string | null;
-  saldo_pendiente: number;
-  activo: boolean;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  pending_balance: number;
+  active: boolean;
   created_at: string;
 }
 
-export interface Producto {
+export interface Product {
   id: string;
-  nombre: string;
-  descripcion: string | null;
-  precio: number;
+  name: string;
+  description: string | null;
+  price: number;
   stock: number;
-  stock_minimo: number;
-  activo: boolean;
+  min_stock: number;
+  active: boolean;
   created_at: string;
 }
 
-export interface Pedido {
+export interface Order {
   id: string;
-  cliente_id: string;
-  mensajero_id: string | null;
-  estado: EstadoPedido;
+  customer_id: string;
+  courier_id: string | null;
+  status: OrderStatus;
   total: number;
-  notas: string | null;
-  fecha_asignacion: string | null;
-  fecha_entrega: string | null;
+  notes: string | null;
+  assigned_at: string | null;
+  delivered_at: string | null;
   created_at: string;
   updated_at: string;
-  // Relaciones
-  cliente?: Cliente;
-  mensajero?: Usuario;
-  items?: PedidoItem[];
-  pagos?: Pago[];
+  customer?: Customer;
+  courier?: User;
+  items?: OrderItem[];
+  payments?: Payment[];
 }
 
-export interface PedidoItem {
+export interface OrderItem {
   id: string;
-  pedido_id: string;
-  producto_id: string;
-  cantidad: number;
-  precio_unitario: number;
-  devuelto: boolean;
-  cantidad_devuelta: number;
-  // Relaciones
-  producto?: Producto;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  returned: boolean;
+  returned_quantity: number;
+  product?: Product;
 }
 
-export interface Pago {
+export interface Payment {
   id: string;
-  pedido_id: string;
-  cliente_id: string;
-  monto: number;
-  tipo: TipoPago;
-  metodo_pago: string;
-  registrado_por: string;
+  order_id: string;
+  customer_id: string;
+  amount: number;
+  type: PaymentType;
+  payment_method: string;
+  registered_by: string;
   created_at: string;
 }
 
-export interface MovimientoInventario {
+export interface InventoryMovement {
   id: string;
-  producto_id: string;
-  tipo: TipoMovimiento;
-  cantidad: number;
-  referencia_pedido: string | null;
-  notas: string | null;
+  product_id: string;
+  type: MovementType;
+  quantity: number;
+  order_reference: string | null;
+  notes: string | null;
   created_at: string;
 }
 
-export interface CierreCaja {
+export interface CashClosing {
   id: string;
-  mensajero_id: string;
-  fecha: string;
-  total_reportado: number;
-  total_sistema: number;
-  diferencia: number;
-  estado: string;
-  notas: string | null;
+  courier_id: string;
+  date: string;
+  reported_total: number;
+  system_total: number;
+  difference: number;
+  status: string;
+  notes: string | null;
   created_at: string;
 }
 
-export interface ConfiguracionNegocio {
+export interface BusinessConfig {
   id: string;
-  nombre_empresa: string;
-  nit: string | null;
-  telefono: string | null;
-  direccion: string | null;
-  condiciones_pago: string | null;
+  company_name: string;
+  tax_id: string | null;
+  phone: string | null;
+  address: string | null;
+  payment_terms: string | null;
   logo_url: string | null;
   updated_at: string;
 }
 
 // ============================================
-// Respuesta estandar de Server Actions
+// Standard Server Action response
 // ============================================
 
 export interface ActionResponse<T = null> {
