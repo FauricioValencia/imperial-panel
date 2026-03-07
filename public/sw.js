@@ -1,5 +1,15 @@
-const CACHE_NAME = "imperial-v1";
-const STATIC_ASSETS = ["/", "/login", "/manifest.webmanifest"];
+const CACHE_NAME = "imperial-v2";
+const STATIC_ASSETS = [
+  "/",
+  "/login",
+  "/deliveries",
+  "/history",
+  "/route",
+  "/profile",
+  "/manifest.webmanifest",
+  "/icons/icon-192.svg",
+  "/icons/icon-512.svg",
+];
 
 // Instalar: cachear assets estaticos
 self.addEventListener("install", (event) => {
@@ -21,24 +31,42 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: network first, fallback to cache
+// Fetch: estrategia diferenciada
 self.addEventListener("fetch", (event) => {
-  // Solo cachear GET requests
   if (event.request.method !== "GET") return;
 
-  // No cachear requests a Supabase ni APIs
   const url = new URL(event.request.url);
+
+  // No cachear requests a Supabase, APIs ni Server Actions
   if (
     url.pathname.startsWith("/api/") ||
-    url.hostname.includes("supabase")
+    url.hostname.includes("supabase") ||
+    event.request.headers.get("Next-Action")
   ) {
     return;
   }
 
+  // Assets estaticos (_next/static): cache first
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Paginas y otros recursos: network first, fallback to cache
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clonar y guardar en cache
         if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
@@ -46,9 +74,13 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => {
-        // Sin red: intentar desde cache
         return caches.match(event.request).then((cached) => {
-          return cached || new Response("Offline", { status: 503 });
+          if (cached) return cached;
+          // Fallback para paginas de navegacion
+          if (event.request.mode === "navigate") {
+            return caches.match("/deliveries");
+          }
+          return new Response("Offline", { status: 503 });
         });
       })
   );

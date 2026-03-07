@@ -9,6 +9,7 @@ const titles: Record<string, string> = {
   "/deliveries": "Mis Entregas",
   "/route": "Mi Ruta",
   "/history": "Historial",
+  "/profile": "Mi Perfil",
 };
 
 export function CourierHeader({ user }: { user: User }) {

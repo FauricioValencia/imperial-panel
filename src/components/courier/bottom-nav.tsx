@@ -23,12 +23,15 @@ export function BottomNav() {
             <Link
               key={tab.label}
               href={tab.href}
-              className={`flex flex-col items-center justify-center gap-1 px-3 py-2 ${
+              className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] min-h-[48px] rounded-lg transition-colors ${
                 active
                   ? "text-[#1E3A5F]"
-                  : "text-[#64748B]"
+                  : "text-[#64748B] active:bg-slate-100"
               }`}
             >
+              {active && (
+                <span className="absolute -top-2 h-0.5 w-8 rounded-full bg-[#1E3A5F]" />
+              )}
               <tab.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
               <span className="text-[10px] font-medium">{tab.label}</span>
             </Link>

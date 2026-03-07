@@ -124,3 +124,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* PWA safe area for notched devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Active press feedback for mobile buttons */
+@media (hover: none) {
+  .active\:scale-95:active {
+    transform: scale(0.95);
+  }
+  button:active,
+  a[role="button"]:active {
+    opacity: 0.85;
+    transition: opacity 0.1s ease;
+  }
+}
+
+/* Prevent text selection on interactive elements in PWA */
+@media (display-mode: standalone) {
+  nav,
+  header,
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}

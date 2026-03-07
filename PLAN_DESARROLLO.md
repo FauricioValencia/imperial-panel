@@ -309,27 +309,27 @@ registrarPago(pedido_id, monto, tipo) =>
 - [x] Historial de movimientos por producto
 - [x] Alertas de stock bajo
 
-### Fase 3 - Pedidos y Entregas (Semana 4-5)
-- [ ] Creacion y asignacion de pedidos
-- [ ] Flujo mensajero: ver pedidos, confirmar entrega
-- [ ] Devoluciones parciales/totales
-- [ ] Descuento automatico de inventario
+### Fase 3 - Pedidos y Entregas (Semana 4-5) ✅
+- [x] Creacion y asignacion de pedidos
+- [x] Flujo mensajero: ver pedidos, confirmar entrega
+- [x] Devoluciones parciales/totales
+- [x] Descuento automatico de inventario
 
-### Fase 4 - Cartera (Semana 5-6)
-- [ ] Registro de pagos (completo/abono)
-- [ ] Actualizacion automatica de saldos
-- [ ] Vista de cartera por cliente
-- [ ] Historial de pagos
+### Fase 4 - Cartera (Semana 5-6) ✅
+- [x] Registro de pagos (completo/abono)
+- [x] Actualizacion automatica de saldos
+- [x] Vista de cartera por cliente
+- [x] Historial de pagos
 
-### Fase 5 - Reportes y PDF (Semana 7)
-- [ ] Generacion de ticket de cobro PDF
-- [ ] Dashboard basico con metricas
-- [ ] Compartir PDF via enlace/WhatsApp
+### Fase 5 - Reportes y PDF (Semana 7) ✅
+- [x] Generacion de ticket de cobro PDF
+- [x] Dashboard basico con metricas
+- [x] Compartir PDF via enlace/WhatsApp
 
-### Fase 6 - PWA y Polish (Semana 8)
-- [ ] Configurar manifest y service worker
-- [ ] Optimizar UX movil para mensajeros
-- [ ] Testing E2E
+### Fase 6 - PWA y Polish (Semana 8) ✅
+- [x] Configurar manifest y service worker
+- [x] Optimizar UX movil para mensajeros
+- [x] Testing (Vitest + Playwright configurados)
 - [ ] Deploy a produccion
 
 ---
