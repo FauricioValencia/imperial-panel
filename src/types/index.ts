@@ -78,6 +78,17 @@ export const confirmDeliverySchema = z.object({
     .optional(),
 });
 
+export const courierSchema = z.object({
+  name: z.string().min(2, "Nombre requerido"),
+  email: z.string().email("Email invalido"),
+  password: z.string().min(6, "Minimo 6 caracteres"),
+});
+
+export const updateCourierSchema = z.object({
+  name: z.string().min(2, "Nombre requerido"),
+  email: z.string().email("Email invalido"),
+});
+
 export const cashClosingSchema = z.object({
   reported_total: z.number().min(0),
   notes: z.string().optional(),
@@ -103,6 +114,8 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
 export type ConfirmDeliveryInput = z.infer<typeof confirmDeliverySchema>;
+export type CourierInput = z.infer<typeof courierSchema>;
+export type UpdateCourierInput = z.infer<typeof updateCourierSchema>;
 export type CashClosingInput = z.infer<typeof cashClosingSchema>;
 export type BusinessConfigInput = z.infer<typeof businessConfigSchema>;
 

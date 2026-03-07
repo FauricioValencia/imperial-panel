@@ -171,10 +171,10 @@ export async function assignCourier(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  // Get order with items
+  // Verify order exists and is pending
   const { data: order } = await ctx.supabase
     .from("orders")
-    .select("id, status, items:order_items(product_id, quantity)")
+    .select("id, status")
     .eq("id", orderId)
     .single();
 
@@ -183,42 +183,7 @@ export async function assignCourier(
     return { success: false, error: "Order must be pending to assign a courier" };
   }
 
-  // Deduct stock for each item via RPC, tracking successful deductions for rollback
-  const deductedItems: { product_id: string; quantity: number }[] = [];
-  const items = order.items as { product_id: string; quantity: number }[];
-
-  for (const item of items) {
-    const { data: stockResult, error: stockError } = await ctx.supabase
-      .rpc("deduct_stock", {
-        p_product_id: item.product_id,
-        p_quantity: item.quantity,
-        p_order_reference: orderId,
-      });
-
-    if (stockError || stockResult === false) {
-      // Rollback previously deducted items
-      for (const deducted of deductedItems) {
-        await ctx.supabase.rpc("return_stock", {
-          p_product_id: deducted.product_id,
-          p_quantity: deducted.quantity,
-          p_order_reference: orderId,
-        });
-      }
-
-      if (stockError) {
-        logError("assign_courier_stock", stockError, { order_id: orderId });
-        return { success: false, error: "Error al descontar stock" };
-      }
-      return {
-        success: false,
-        error: "Stock insuficiente para uno o mas productos",
-      };
-    }
-
-    deductedItems.push({ product_id: item.product_id, quantity: item.quantity });
-  }
-
-  // Update order
+  // Update order (stock is deducted on delivery confirmation, not here)
   const { error } = await ctx.supabase
     .from("orders")
     .update({
@@ -229,14 +194,6 @@ export async function assignCourier(
     .eq("id", orderId);
 
   if (error) {
-    // Rollback all stock deductions
-    for (const deducted of deductedItems) {
-      await ctx.supabase.rpc("return_stock", {
-        p_product_id: deducted.product_id,
-        p_quantity: deducted.quantity,
-        p_order_reference: orderId,
-      });
-    }
     logError("assign_courier", error, { order_id: orderId });
     return { success: false, error: "Error assigning courier" };
   }
@@ -356,106 +313,95 @@ export async function confirmDelivery(
   const items = order.items as { id: string; product_id: string; quantity: number }[];
   const hasReturns = returnedItems && returnedItems.length > 0;
 
+  // Build a map of returned quantities per order_item_id
+  const returnMap = new Map<string, number>();
   if (hasReturns) {
-    // Process returns
-    let allReturned = true;
+    for (const r of returnedItems) {
+      returnMap.set(r.order_item_id, r.returned_quantity);
+    }
+  }
 
-    for (const returnItem of returnedItems) {
-      const orderItem = items.find((i) => i.id === returnItem.order_item_id);
-      if (!orderItem) continue;
+  // Deduct stock only for delivered quantities (total - returned)
+  let allReturned = true;
+  const deductedItems: { product_id: string; quantity: number }[] = [];
 
-      // Return stock via RPC
-      const { error: returnError } = await ctx.supabase.rpc("return_stock", {
-        p_product_id: orderItem.product_id,
-        p_quantity: returnItem.returned_quantity,
-        p_order_reference: orderId,
-      });
+  for (const item of items) {
+    const returnedQty = returnMap.get(item.id) ?? 0;
+    const deliveredQty = item.quantity - returnedQty;
 
-      if (returnError) {
-        logError("confirm_delivery_return_stock", returnError, { order_id: orderId });
-        return { success: false, error: "Error al reingresar stock" };
+    if (deliveredQty > 0) {
+      allReturned = false;
+
+      const { data: stockResult, error: stockError } = await ctx.supabase
+        .rpc("deduct_stock", {
+          p_product_id: item.product_id,
+          p_quantity: deliveredQty,
+          p_order_reference: orderId,
+        });
+
+      if (stockError || stockResult === false) {
+        // Rollback previously deducted items
+        for (const deducted of deductedItems) {
+          await ctx.supabase.rpc("return_stock", {
+            p_product_id: deducted.product_id,
+            p_quantity: deducted.quantity,
+            p_order_reference: orderId,
+          });
+        }
+        logError("confirm_delivery_stock", stockError, { order_id: orderId });
+        return { success: false, error: "Error al descontar stock" };
       }
 
-      // Update order item
+      deductedItems.push({ product_id: item.product_id, quantity: deliveredQty });
+    }
+
+    // Update order item if it has returns
+    if (returnedQty > 0) {
       const { error: itemUpdateError } = await ctx.supabase
         .from("order_items")
         .update({
-          returned: returnItem.returned_quantity >= orderItem.quantity,
-          returned_quantity: returnItem.returned_quantity,
+          returned: returnedQty >= item.quantity,
+          returned_quantity: returnedQty,
         })
-        .eq("id", returnItem.order_item_id);
+        .eq("id", item.id);
 
       if (itemUpdateError) {
         logError("confirm_delivery_update_item", itemUpdateError, { order_id: orderId });
         return { success: false, error: "Error al actualizar items" };
       }
-
-      if (returnItem.returned_quantity < orderItem.quantity) {
-        allReturned = false;
-      }
     }
-
-    // Check if ALL items were fully returned
-    const returnedItemIds = returnedItems.map((r) => r.order_item_id);
-    const nonReturnedItems = items.filter((i) => !returnedItemIds.includes(i.id));
-    if (nonReturnedItems.length > 0) allReturned = false;
-
-    // Determine final status
-    const finalStatus = allReturned ? "returned" : "partial";
-
-    const { error: statusError } = await ctx.supabase
-      .from("orders")
-      .update({
-        status: finalStatus,
-        delivered_at: new Date().toISOString(),
-      })
-      .eq("id", orderId);
-
-    if (statusError) {
-      logError("confirm_delivery_status", statusError, { order_id: orderId });
-      return { success: false, error: "Error al actualizar estado del pedido" };
-    }
-
-    // Update customer balance
-    const { error: balanceError } = await ctx.supabase.rpc("update_customer_balance", {
-      p_customer_id: order.customer_id,
-    });
-
-    if (balanceError) {
-      logError("confirm_delivery_balance", balanceError, { order_id: orderId });
-    }
-
-    logOperacion("delivery_confirmed_with_returns", {
-      order_id: orderId,
-      status: finalStatus,
-      returned_items: returnedItems.length,
-    }, ctx.user.id);
-  } else {
-    // Full delivery, no returns
-    const { error: statusError } = await ctx.supabase
-      .from("orders")
-      .update({
-        status: "delivered",
-        delivered_at: new Date().toISOString(),
-      })
-      .eq("id", orderId);
-
-    if (statusError) {
-      logError("confirm_delivery_status", statusError, { order_id: orderId });
-      return { success: false, error: "Error al actualizar estado del pedido" };
-    }
-
-    // Update customer balance
-    const { error: balanceError } = await ctx.supabase.rpc("update_customer_balance", {
-      p_customer_id: order.customer_id,
-    });
-
-    if (balanceError) {
-      logError("confirm_delivery_balance", balanceError, { order_id: orderId });
-    }
-
-    logOperacion("delivery_confirmed", { order_id: orderId }, ctx.user.id);
   }
+
+  // Determine final status
+  const finalStatus = allReturned ? "returned" : hasReturns ? "partial" : "delivered";
+
+  const { error: statusError } = await ctx.supabase
+    .from("orders")
+    .update({
+      status: finalStatus,
+      delivered_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+
+  if (statusError) {
+    logError("confirm_delivery_status", statusError, { order_id: orderId });
+    return { success: false, error: "Error al actualizar estado del pedido" };
+  }
+
+  // Update customer balance
+  const { error: balanceError } = await ctx.supabase.rpc("update_customer_balance", {
+    p_customer_id: order.customer_id,
+  });
+
+  if (balanceError) {
+    logError("confirm_delivery_balance", balanceError, { order_id: orderId });
+  }
+
+  logOperacion(hasReturns ? "delivery_confirmed_with_returns" : "delivery_confirmed", {
+    order_id: orderId,
+    status: finalStatus,
+    returned_items: returnMap.size,
+  }, ctx.user.id);
 
   revalidatePath("/deliveries");
   revalidatePath("/orders");

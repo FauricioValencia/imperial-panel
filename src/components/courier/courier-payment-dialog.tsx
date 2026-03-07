@@ -27,12 +27,14 @@ interface CourierPaymentDialogProps {
   open: boolean;
   onClose: () => void;
   order: Order;
+  deliveredTotal?: number;
 }
 
 export function CourierPaymentDialog({
   open,
   onClose,
   order,
+  deliveredTotal,
 }: CourierPaymentDialogProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -40,13 +42,15 @@ export function CourierPaymentDialog({
   const [mode, setMode] = useState<"full" | "partial" | null>(null);
   const [amount, setAmount] = useState("");
 
+  const totalToPay = deliveredTotal ?? order.total;
+
   function handleFullPayment() {
     setError("");
     startTransition(async () => {
       const result = await registerPayment({
         order_id: order.id,
-        amount: order.total,
-        type: "full",
+        amount: totalToPay,
+        type: totalToPay === order.total ? "full" : "partial",
         payment_method: "cash",
       });
 
@@ -97,7 +101,7 @@ export function CourierPaymentDialog({
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">Registrar Pago</DialogTitle>
           <DialogDescription>
-            {order.customer?.name} — {formatCurrency(order.total)}
+            {order.customer?.name} — Total entregado: {formatCurrency(totalToPay)}
           </DialogDescription>
         </DialogHeader>
 
@@ -114,7 +118,7 @@ export function CourierPaymentDialog({
               disabled={isPending}
               className="w-full min-h-[52px] bg-[#10B981] hover:bg-[#059669] text-lg"
             >
-              {isPending ? "Registrando..." : `Pago completo ${formatCurrency(order.total)}`}
+              {isPending ? "Registrando..." : `Pago completo ${formatCurrency(totalToPay)}`}
             </Button>
             <Button
               onClick={() => setMode("partial")}
@@ -144,7 +148,7 @@ export function CourierPaymentDialog({
               <Input
                 type="number"
                 min={1}
-                max={order.total}
+                max={totalToPay}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Monto"

@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Phone, Package, Truck, CheckCircle, Undo2 } from "lucide-react";
+import { MapPin, Phone, Package, Truck, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { markInTransit, confirmDelivery } from "@/actions/orders";
+import { markInTransit } from "@/actions/orders";
 import { ConfirmDeliveryDialog } from "./confirm-delivery-dialog";
 import { CourierPaymentDialog } from "./courier-payment-dialog";
 import type { Order } from "@/types";
@@ -29,6 +29,7 @@ export function DeliveryCard({ order }: { order: Order }) {
   const [isPending, startTransition] = useTransition();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [deliveredTotal, setDeliveredTotal] = useState(order.total);
   const [error, setError] = useState("");
   const config = statusConfig[order.status] || statusConfig.assigned;
 
@@ -44,16 +45,10 @@ export function DeliveryCard({ order }: { order: Order }) {
     });
   }
 
-  function handleDelivered() {
-    setError("");
-    startTransition(async () => {
-      const result = await confirmDelivery(order.id);
-      if (result.success) {
-        setShowPayment(true);
-      } else {
-        setError(result.error || "Error al confirmar entrega");
-      }
-    });
+  function handleDelivered(total: number) {
+    setDeliveredTotal(total);
+    setShowConfirm(false);
+    setShowPayment(true);
   }
 
   return (
@@ -131,25 +126,14 @@ export function DeliveryCard({ order }: { order: Order }) {
               </Button>
             )}
             {order.status === "in_transit" && (
-              <>
-                <Button
-                  onClick={handleDelivered}
-                  disabled={isPending}
-                  className="flex-1 bg-[#10B981] hover:bg-[#059669] min-h-[44px]"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {isPending ? "Confirmando..." : "Entregado"}
-                </Button>
-                <Button
-                  onClick={() => setShowConfirm(true)}
-                  disabled={isPending}
-                  variant="outline"
-                  className="min-h-[44px] border-[#EF4444] text-[#EF4444] hover:bg-red-50"
-                >
-                  <Undo2 className="mr-2 h-4 w-4" />
-                  Devolucion
-                </Button>
-              </>
+              <Button
+                onClick={() => setShowConfirm(true)}
+                disabled={isPending}
+                className="flex-1 bg-[#10B981] hover:bg-[#059669] min-h-[44px]"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Confirmar entrega
+              </Button>
             )}
           </div>
         </CardContent>
@@ -158,6 +142,7 @@ export function DeliveryCard({ order }: { order: Order }) {
       <ConfirmDeliveryDialog
         open={showConfirm}
         onClose={() => setShowConfirm(false)}
+        onDelivered={handleDelivered}
         order={order}
       />
 
@@ -165,6 +150,7 @@ export function DeliveryCard({ order }: { order: Order }) {
         open={showPayment}
         onClose={() => { setShowPayment(false); router.refresh(); }}
         order={order}
+        deliveredTotal={deliveredTotal}
       />
     </>
   );

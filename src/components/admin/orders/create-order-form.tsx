@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -50,6 +49,10 @@ interface CreateOrderFormProps {
 export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
   const router = useRouter();
   const [customerId, setCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -58,6 +61,29 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
   const [isPending, startTransition] = useTransition();
 
   const total = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+
+  const selectedCustomer = customers.find((c) => c.id === customerId);
+  const filteredCustomers = customers.filter((c) => {
+    const term = customerSearch.toLowerCase();
+    if (!term) return true;
+    return (
+      c.name.toLowerCase().includes(term) ||
+      (c.phone && c.phone.toLowerCase().includes(term)) ||
+      (c.address && c.address.toLowerCase().includes(term))
+    );
+  });
+
+  function handleSelectCustomer(id: string) {
+    setCustomerId(id);
+    const customer = customers.find((c) => c.id === id);
+    setCustomerSearch(customer?.name ?? "");
+    setCustomerDropdownOpen(false);
+  }
+
+  function handleClearCustomer() {
+    setCustomerId("");
+    setCustomerSearch("");
+  }
 
   const availableProducts = products.filter(
     (p) => p.stock > 0 && !items.some((i) => i.product_id === p.id)
@@ -132,18 +158,67 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
           <CardTitle className="text-base text-[#1E293B]">Cliente</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={customerId} onValueChange={setCustomerId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar cliente..." />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} {c.phone ? `— ${c.phone}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative" ref={dropdownRef}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+              <Input
+                ref={customerInputRef}
+                placeholder="Buscar por nombre, telefono o direccion..."
+                value={customerSearch}
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setCustomerDropdownOpen(true);
+                  if (!e.target.value) setCustomerId("");
+                }}
+                onFocus={() => setCustomerDropdownOpen(true)}
+                onBlur={() => {
+                  // Delay to allow click on dropdown item
+                  setTimeout(() => setCustomerDropdownOpen(false), 150);
+                }}
+                className="pl-9"
+              />
+            </div>
+            {selectedCustomer && (
+              <div className="mt-2 flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm">
+                <Check className="h-4 w-4 text-[#10B981]" />
+                <span className="font-medium text-[#1E293B]">{selectedCustomer.name}</span>
+                {selectedCustomer.phone && (
+                  <span className="text-[#64748B]">— {selectedCustomer.phone}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClearCustomer}
+                  className="ml-auto text-xs text-[#64748B] hover:text-[#EF4444]"
+                >
+                  Cambiar
+                </button>
+              </div>
+            )}
+            {customerDropdownOpen && !selectedCustomer && (
+              <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                {filteredCustomers.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-[#64748B]">
+                    No se encontraron clientes
+                  </div>
+                ) : (
+                  filteredCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectCustomer(c.id)}
+                      className="flex w-full flex-col px-3 py-2 text-left hover:bg-slate-50"
+                    >
+                      <span className="text-sm font-medium text-[#1E293B]">{c.name}</span>
+                      <span className="text-xs text-[#64748B]">
+                        {[c.phone, c.address].filter(Boolean).join(" — ") || "Sin datos adicionales"}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

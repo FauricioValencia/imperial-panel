@@ -30,12 +30,22 @@ export function ProductForm({ open, onClose, product }: ProductFormProps) {
 
   const [state, formAction, isPending] = useActionState(actionFn, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const prevSuccessRef = useRef(false);
 
   useEffect(() => {
-    if (state.success) {
+    // Only close on transition from false → true (new success)
+    if (state.success && !prevSuccessRef.current) {
       onClose();
     }
+    prevSuccessRef.current = state.success;
   }, [state.success, onClose]);
+
+  // Reset ref when dialog opens so next success triggers close
+  useEffect(() => {
+    if (open) {
+      prevSuccessRef.current = false;
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

@@ -1,6 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { listAllCouriers } from "@/actions/couriers";
+import { CouriersTable } from "@/components/admin/couriers/couriers-table";
 
-export default function CouriersPage() {
+export default async function CouriersPage() {
+  const result = await listAllCouriers();
+  const couriers = result.data ?? [];
+
   return (
     <div className="space-y-6">
       <div>
@@ -9,16 +13,7 @@ export default function CouriersPage() {
           Gestion de mensajeros y domiciliarios
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Listado de Domiciliarios</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-[#64748B]">
-            Modulo de domiciliarios en desarrollo.
-          </p>
-        </CardContent>
-      </Card>
+      <CouriersTable initialCouriers={couriers} />
     </div>
   );
 }

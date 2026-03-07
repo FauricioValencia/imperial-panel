@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { registerStockEntry } from "@/actions/inventory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,12 +24,20 @@ interface StockEntryDialogProps {
 
 export function StockEntryDialog({ open, onClose, product }: StockEntryDialogProps) {
   const [state, formAction, isPending] = useActionState(registerStockEntry, initialState);
+  const prevSuccessRef = useRef(false);
 
   useEffect(() => {
-    if (state.success) {
+    if (state.success && !prevSuccessRef.current) {
       onClose();
     }
+    prevSuccessRef.current = state.success;
   }, [state.success, onClose]);
+
+  useEffect(() => {
+    if (open) {
+      prevSuccessRef.current = false;
+    }
+  }, [open]);
 
   if (!product) return null;
 
