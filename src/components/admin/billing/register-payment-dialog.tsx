@@ -47,13 +47,19 @@ export function RegisterPaymentDialog({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [amount, setAmount] = useState("");
-  const [type, setType] = useState<PaymentType>("full");
+  const [type, setType] = useState<PaymentType | "">("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
 
   const remaining = order.total - totalPaid;
 
   function handleSubmit() {
     setError("");
+
+    if (!type) {
+      setError("Selecciona un tipo de pago");
+      return;
+    }
+
     const numAmount = Number(amount);
 
     if (!numAmount || numAmount <= 0) {
@@ -76,7 +82,7 @@ export function RegisterPaymentDialog({
 
       if (result.success) {
         setAmount("");
-        setType("full");
+        setType("");
         setMethod("cash");
         onClose();
         router.refresh();
@@ -89,14 +95,15 @@ export function RegisterPaymentDialog({
   function handleClose() {
     setAmount("");
     setError("");
-    setType("full");
+    setType("");
     setMethod("cash");
     onClose();
   }
 
   function handleTypeChange(val: string) {
-    setType(val as PaymentType);
-    if (val === "full") {
+    const newType = val as PaymentType;
+    setType(newType);
+    if (newType === "full") {
       setAmount(String(remaining));
     } else {
       setAmount("");
@@ -126,7 +133,7 @@ export function RegisterPaymentDialog({
             <label className="text-sm font-medium text-[#1E293B]">Tipo de pago</label>
             <Select value={type} onValueChange={handleTypeChange}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Selecciona tipo de pago" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="full">Pago completo</SelectItem>
@@ -144,7 +151,7 @@ export function RegisterPaymentDialog({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Monto del pago"
-              disabled={type === "full"}
+              disabled={!type || type === "full"}
             />
           </div>
 
@@ -170,7 +177,7 @@ export function RegisterPaymentDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending || !amount}
+            disabled={isPending || !type || !amount}
             className="bg-[#10B981] hover:bg-[#059669]"
           >
             {isPending ? "Registrando..." : "Registrar pago"}

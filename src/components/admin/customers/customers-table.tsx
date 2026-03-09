@@ -159,6 +159,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
       </div>
 
       <CustomerForm
+        key={editingCustomer?.id ?? "new"}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         customer={editingCustomer}
