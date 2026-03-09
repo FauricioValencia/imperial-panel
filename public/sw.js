@@ -37,6 +37,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
+  // Solo cachear requests HTTP/HTTPS (ignorar chrome-extension, etc.)
+  if (!url.protocol.startsWith("http")) return;
+
   // No cachear requests a Supabase, APIs ni Server Actions
   if (
     url.pathname.startsWith("/api/") ||

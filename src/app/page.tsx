@@ -12,5 +12,9 @@ export default async function HomePage() {
     redirect("/deliveries");
   }
 
+  if (user.role === "super_admin") {
+    redirect("/admin-panel");
+  }
+
   redirect("/dashboard");
 }

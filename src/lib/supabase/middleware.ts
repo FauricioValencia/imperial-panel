@@ -46,7 +46,7 @@ export async function updateSession(request: NextRequest) {
   // (the corresponding layout will handle role-based redirects)
   if (user && isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

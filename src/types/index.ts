@@ -4,7 +4,8 @@ import { z } from "zod";
 // Enums
 // ============================================
 
-export const USER_ROLE = ["admin", "courier"] as const;
+export const USER_ROLE = ["admin", "courier", "super_admin"] as const;
+export const MANAGEABLE_ROLES = ["admin", "courier"] as const;
 export const ORDER_STATUS = [
   "pending",
   "assigned",
@@ -94,6 +95,18 @@ export const cashClosingSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const createUserSchema = z.object({
+  name: z.string().min(2, "Nombre requerido"),
+  email: z.string().email("Email invalido"),
+  password: z.string().min(6, "Minimo 6 caracteres"),
+  role: z.enum(MANAGEABLE_ROLES, { message: "Rol invalido" }),
+});
+
+export const updateUserSchema = z.object({
+  name: z.string().min(2, "Nombre requerido"),
+  email: z.string().email("Email invalido"),
+});
+
 export const businessConfigSchema = z.object({
   company_name: z.string().min(2),
   tax_id: z.string().optional(),
@@ -117,6 +130,8 @@ export type ConfirmDeliveryInput = z.infer<typeof confirmDeliverySchema>;
 export type CourierInput = z.infer<typeof courierSchema>;
 export type UpdateCourierInput = z.infer<typeof updateCourierSchema>;
 export type CashClosingInput = z.infer<typeof cashClosingSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type BusinessConfigInput = z.infer<typeof businessConfigSchema>;
 
 // ============================================
