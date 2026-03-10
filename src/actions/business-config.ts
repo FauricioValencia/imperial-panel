@@ -1,34 +1,30 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyAuth } from "@/lib/auth-helpers";
 import { businessConfigSchema, type ActionResponse, type BusinessConfig } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
 
-async function verifySuperAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "super_admin") return null;
-  return { supabase, user: userData };
+/** Verify user is admin or super_admin */
+async function verifyAdminOrSuper() {
+  const ctx = await verifyAuth();
+  if (!ctx) return null;
+  if (ctx.user.role !== "admin" && ctx.user.role !== "super_admin") return null;
+  return ctx;
 }
 
 export async function getBusinessConfig(): Promise<ActionResponse<BusinessConfig>> {
-  const ctx = await verifySuperAdmin();
+  const ctx = await verifyAdminOrSuper();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
-  const { data, error } = await ctx.supabase
-    .from("business_config")
-    .select("*")
-    .limit(1)
-    .single();
+  let query = ctx.supabase.from("business_config").select("*");
+
+  // Admin sees their own config; super_admin sees first one (for global panel)
+  if (ctx.user.role === "admin") {
+    query = query.eq("admin_id", ctx.user.id);
+  }
+
+  const { data, error } = await query.limit(1).single();
 
   if (error) {
     logError("get_business_config", error);
@@ -42,7 +38,7 @@ export async function updateBusinessConfig(
   _prevState: ActionResponse,
   formData: FormData
 ): Promise<ActionResponse> {
-  const ctx = await verifySuperAdmin();
+  const ctx = await verifyAdminOrSuper();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
   const raw = {
@@ -59,11 +55,11 @@ export async function updateBusinessConfig(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  const { data: existing } = await ctx.supabase
-    .from("business_config")
-    .select("id")
-    .limit(1)
-    .single();
+  let existingQuery = ctx.supabase.from("business_config").select("id");
+  if (ctx.user.role === "admin") {
+    existingQuery = existingQuery.eq("admin_id", ctx.user.id);
+  }
+  const { data: existing } = await existingQuery.limit(1).single();
 
   if (!existing) {
     return { success: false, error: "No se encontro configuracion" };
@@ -85,7 +81,7 @@ export async function updateBusinessConfig(
 }
 
 export async function uploadLogo(formData: FormData): Promise<ActionResponse<string>> {
-  const ctx = await verifySuperAdmin();
+  const ctx = await verifyAdminOrSuper();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
   const file = formData.get("logo") as File | null;
@@ -122,11 +118,11 @@ export async function uploadLogo(formData: FormData): Promise<ActionResponse<str
 
   const logoUrl = urlData.publicUrl;
 
-  const { data: existing } = await ctx.supabase
-    .from("business_config")
-    .select("id")
-    .limit(1)
-    .single();
+  let logoQuery = ctx.supabase.from("business_config").select("id");
+  if (ctx.user.role === "admin") {
+    logoQuery = logoQuery.eq("admin_id", ctx.user.id);
+  }
+  const { data: existing } = await logoQuery.limit(1).single();
 
   if (existing) {
     await ctx.supabase

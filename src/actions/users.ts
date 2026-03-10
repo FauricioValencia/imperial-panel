@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/server";
+import { verifySuperAdmin } from "@/lib/auth-helpers";
 import {
   createUserSchema,
   updateUserSchema,
@@ -9,21 +10,6 @@ import {
   type User,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
-
-async function verifySuperAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "super_admin") return null;
-  return { supabase, user: userData };
-}
 
 export async function listUsers(): Promise<ActionResponse<User[]>> {
   const ctx = await verifySuperAdmin();
@@ -78,6 +64,9 @@ export async function createUser(
     return { success: false, error: "Error al crear usuario de autenticacion" };
   }
 
+  // For admins: admin_id = their own id. For couriers: admin_id needs an assigned admin.
+  const adminId = result.data.role === "admin" ? authData.user.id : null;
+
   const { error: insertError } = await admin
     .from("users")
     .insert({
@@ -86,12 +75,21 @@ export async function createUser(
       name: result.data.name,
       role: result.data.role,
       active: true,
+      admin_id: adminId,
     });
 
   if (insertError) {
     await admin.auth.admin.deleteUser(authData.user.id);
     logError("create_user_insert", insertError);
     return { success: false, error: "Error al registrar usuario" };
+  }
+
+  // Auto-create business_config for new admins
+  if (result.data.role === "admin") {
+    await admin.from("business_config").insert({
+      company_name: result.data.name,
+      admin_id: authData.user.id,
+    });
   }
 
   logOperacion("user_created", {

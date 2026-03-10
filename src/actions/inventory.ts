@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyAdmin } from "@/lib/auth-helpers";
 import {
   productSchema,
   type ActionResponse,
@@ -16,23 +16,6 @@ const stockEntrySchema = z.object({
   quantity: z.number().int().positive("Quantity must be positive"),
   notes: z.string().optional(),
 });
-
-async function verifyAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "admin") return null;
-
-  return { supabase, user: userData };
-}
 
 export async function listProducts(search?: string): Promise<ActionResponse<Product[]>> {
   const ctx = await verifyAdmin();
@@ -80,7 +63,7 @@ export async function createProduct(
 
   const { data, error } = await ctx.supabase
     .from("products")
-    .insert(result.data)
+    .insert({ ...result.data, admin_id: ctx.user.id })
     .select()
     .single();
 
@@ -95,6 +78,7 @@ export async function createProduct(
       type: "inbound",
       quantity: result.data.stock,
       notes: "Initial stock on product creation",
+      admin_id: ctx.user.id,
     });
   }
 

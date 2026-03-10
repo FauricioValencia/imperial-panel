@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyAdmin, verifyAuth } from "@/lib/auth-helpers";
 import {
   registerPaymentSchema,
   type ActionResponse,
@@ -10,36 +10,6 @@ import {
   type Order,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
-
-async function verifyAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "admin") return null;
-  return { supabase, user: userData };
-}
-
-async function verifyAuth() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData) return null;
-  return { supabase, user: userData };
-}
 
 // List customers with pending balances (billing overview)
 export async function listBillingCustomers(): Promise<ActionResponse<Customer[]>> {
@@ -188,6 +158,7 @@ export async function registerPayment(input: {
       type,
       payment_method,
       registered_by: ctx.user.id,
+      admin_id: ctx.user.admin_id ?? ctx.user.id,
     });
 
   if (paymentError) {

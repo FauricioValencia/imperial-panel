@@ -1,26 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyAdmin } from "@/lib/auth-helpers";
 import { customerSchema, type ActionResponse, type Customer } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
-
-async function verifyAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "admin") return null;
-
-  return { supabase, user: userData };
-}
 
 export async function listCustomers(search?: string): Promise<ActionResponse<Customer[]>> {
   const ctx = await verifyAdmin();
@@ -66,7 +49,7 @@ export async function createCustomer(
 
   const { data, error } = await ctx.supabase
     .from("customers")
-    .insert(result.data)
+    .insert({ ...result.data, admin_id: ctx.user.id })
     .select()
     .single();
 

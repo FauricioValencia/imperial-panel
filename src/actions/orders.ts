@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyAdmin, verifyAuth } from "@/lib/auth-helpers";
 import {
   createOrderSchema,
   assignCourierSchema,
@@ -12,36 +12,6 @@ import {
   type User,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
-
-async function verifyAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "admin") return null;
-  return { supabase, user: userData };
-}
-
-async function verifyAuth() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData) return null;
-  return { supabase, user: userData };
-}
 
 export async function listOrders(
   statusFilter?: string
@@ -117,7 +87,7 @@ export async function createOrder(
   // Insert order
   const { data: order, error: orderError } = await ctx.supabase
     .from("orders")
-    .insert({ customer_id, total, notes, status: "pending" })
+    .insert({ customer_id, total, notes, status: "pending", admin_id: ctx.user.id })
     .select("id")
     .single();
 
@@ -132,6 +102,7 @@ export async function createOrder(
     product_id: item.product_id,
     quantity: item.quantity,
     unit_price: item.unit_price,
+    admin_id: ctx.user.id,
   }));
 
   const { error: itemsError } = await ctx.supabase
@@ -216,6 +187,7 @@ export async function listCouriers(): Promise<ActionResponse<User[]>> {
     .select("*")
     .eq("role", "courier")
     .eq("active", true)
+    .eq("admin_id", ctx.user.id)
     .order("name");
 
   if (error) {

@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/server";
+import { verifyAdmin } from "@/lib/auth-helpers";
 import {
   courierSchema,
   updateCourierSchema,
@@ -11,21 +12,6 @@ import {
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
 
-async function verifyAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "admin") return null;
-  return { supabase, user: userData };
-}
-
 export async function listAllCouriers(): Promise<ActionResponse<User[]>> {
   const ctx = await verifyAdmin();
   if (!ctx) return { success: false, error: "Unauthorized" };
@@ -34,6 +20,7 @@ export async function listAllCouriers(): Promise<ActionResponse<User[]>> {
     .from("users")
     .select("*")
     .eq("role", "courier")
+    .eq("admin_id", ctx.user.id)
     .order("name");
 
   if (error) {
@@ -78,7 +65,7 @@ export async function createCourier(
     return { success: false, error: "Error al crear usuario de autenticacion" };
   }
 
-  // Insert into users table
+  // Insert into users table (admin_id = creator admin's id)
   const { error: insertError } = await admin
     .from("users")
     .insert({
@@ -87,6 +74,7 @@ export async function createCourier(
       name: result.data.name,
       role: "courier",
       active: true,
+      admin_id: ctx.user.id,
     });
 
   if (insertError) {

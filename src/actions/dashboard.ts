@@ -1,23 +1,8 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { verifyAdmin } from "@/lib/auth-helpers";
 import { type ActionResponse } from "@/types";
 import { logError } from "@/lib/logger";
-
-async function verifyAdmin() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!userData || userData.role !== "admin") return null;
-  return { supabase, user: userData };
-}
 
 interface DashboardMetrics {
   orders_today: number;
@@ -64,12 +49,13 @@ export async function getDashboardMetrics(): Promise<ActionResponse<DashboardMet
       .eq("active", true)
       .gt("pending_balance", 0),
 
-    // Active couriers
+    // Active couriers (only this admin's couriers)
     ctx.supabase
       .from("users")
       .select("id", { count: "exact", head: true })
       .eq("role", "courier")
-      .eq("active", true),
+      .eq("active", true)
+      .eq("admin_id", ctx.user.id),
 
     // Products with low stock
     ctx.supabase

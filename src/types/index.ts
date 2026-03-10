@@ -149,6 +149,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  admin_id: string | null;
   active: boolean;
   created_at: string;
 }
@@ -159,6 +160,7 @@ export interface Customer {
   phone: string | null;
   address: string | null;
   pending_balance: number;
+  admin_id: string;
   active: boolean;
   created_at: string;
 }
@@ -170,6 +172,7 @@ export interface Product {
   price: number;
   stock: number;
   min_stock: number;
+  admin_id: string;
   active: boolean;
   created_at: string;
 }
@@ -181,6 +184,7 @@ export interface Order {
   status: OrderStatus;
   total: number;
   notes: string | null;
+  admin_id: string;
   assigned_at: string | null;
   delivered_at: string | null;
   created_at: string;
@@ -199,6 +203,7 @@ export interface OrderItem {
   unit_price: number;
   returned: boolean;
   returned_quantity: number;
+  admin_id: string;
   product?: Product;
 }
 
@@ -210,6 +215,7 @@ export interface Payment {
   type: PaymentType;
   payment_method: PaymentMethod;
   registered_by: string;
+  admin_id: string;
   created_at: string;
 }
 
@@ -220,6 +226,7 @@ export interface InventoryMovement {
   quantity: number;
   order_reference: string | null;
   notes: string | null;
+  admin_id: string;
   created_at: string;
 }
 
@@ -232,6 +239,7 @@ export interface CashClosing {
   difference: number;
   status: (typeof CLOSING_STATUS)[number];
   notes: string | null;
+  admin_id: string;
   created_at: string;
 }
 
@@ -243,6 +251,7 @@ export interface BusinessConfig {
   address: string | null;
   payment_terms: string | null;
   logo_url: string | null;
+  admin_id: string;
   updated_at: string;
 }
 
