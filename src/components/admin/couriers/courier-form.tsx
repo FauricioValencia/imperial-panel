@@ -12,7 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { ActionResponse, User } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { ActionResponse, User, Zone } from "@/types";
 
 const initialState: ActionResponse = { success: false };
 
@@ -20,9 +27,10 @@ interface CourierFormProps {
   open: boolean;
   onClose: () => void;
   courier?: User | null;
+  zones?: Zone[];
 }
 
-export function CourierForm({ open, onClose, courier }: CourierFormProps) {
+export function CourierForm({ open, onClose, courier, zones = [] }: CourierFormProps) {
   const isEditing = !!courier;
   const actionFn = isEditing
     ? updateCourier.bind(null, courier.id)
@@ -83,6 +91,29 @@ export function CourierForm({ open, onClose, courier }: CourierFormProps) {
               disabled={isPending}
             />
           </div>
+
+          {zones.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="zone_id">Zona</Label>
+              <Select
+                name="zone_id"
+                defaultValue={courier?.zone_id ?? ""}
+                disabled={isPending}
+              >
+                <SelectTrigger id="zone_id">
+                  <SelectValue placeholder="Sin zona asignada" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin zona</SelectItem>
+                  {zones.map((z) => (
+                    <SelectItem key={z.id} value={z.id}>
+                      {z.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {!isEditing && (
             <div className="space-y-2">

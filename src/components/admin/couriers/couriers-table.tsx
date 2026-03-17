@@ -16,13 +16,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CourierForm } from "./courier-form";
 import { toggleCourierActive } from "@/actions/couriers";
-import type { User } from "@/types";
+import type { User, Zone } from "@/types";
 
 interface CouriersTableProps {
   initialCouriers: User[];
+  zones?: Zone[];
 }
 
-export function CouriersTable({ initialCouriers }: CouriersTableProps) {
+export function CouriersTable({ initialCouriers, zones = [] }: CouriersTableProps) {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingCourier, setEditingCourier] = useState<User | null>(null);
@@ -79,6 +80,7 @@ export function CouriersTable({ initialCouriers }: CouriersTableProps) {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Zona</TableHead>
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="w-[100px]">Acciones</TableHead>
             </TableRow>
@@ -100,6 +102,11 @@ export function CouriersTable({ initialCouriers }: CouriersTableProps) {
                   </TableCell>
                   <TableCell className="text-[#64748B]">
                     {courier.email}
+                  </TableCell>
+                  <TableCell className="text-[#64748B] text-sm">
+                    {courier.zone
+                      ? courier.zone.name
+                      : zones.find((z) => z.id === courier.zone_id)?.name || "—"}
                   </TableCell>
                   <TableCell className="text-center">
                     {courier.active ? (
@@ -155,6 +162,7 @@ export function CouriersTable({ initialCouriers }: CouriersTableProps) {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         courier={editingCourier}
+        zones={zones}
       />
     </>
   );

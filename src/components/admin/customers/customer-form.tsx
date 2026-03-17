@@ -11,7 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { ActionResponse, Customer } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { ActionResponse, Customer, User } from "@/types";
 
 const initialState: ActionResponse = { success: false };
 
@@ -19,9 +26,10 @@ interface CustomerFormProps {
   open: boolean;
   onClose: () => void;
   customer?: Customer | null;
+  couriers?: User[];
 }
 
-export function CustomerForm({ open, onClose, customer }: CustomerFormProps) {
+export function CustomerForm({ open, onClose, customer, couriers = [] }: CustomerFormProps) {
   const isEditing = !!customer;
   const actionFn = isEditing
     ? updateCustomer.bind(null, customer.id)
@@ -90,6 +98,42 @@ export function CustomerForm({ open, onClose, customer }: CustomerFormProps) {
               disabled={isPending}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reference_code">Código de referencia</Label>
+            <Input
+              id="reference_code"
+              name="reference_code"
+              placeholder="Ej: CLI-001"
+              defaultValue={customer?.reference_code ?? ""}
+              disabled={isPending}
+              className="uppercase"
+            />
+          </div>
+
+          {couriers.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="preferred_courier_id">Domiciliario asignado</Label>
+              <Select
+                name="preferred_courier_id"
+                defaultValue={customer?.preferred_courier_id ?? ""}
+                disabled={isPending}
+              >
+                <SelectTrigger id="preferred_courier_id">
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin asignar</SelectItem>
+                  {couriers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-[#64748B]">Solo informativo, no afecta la asignación de pedidos</p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>

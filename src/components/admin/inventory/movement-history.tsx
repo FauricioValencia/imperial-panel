@@ -103,7 +103,7 @@ export function MovementHistory({
                 <TableRow>
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead>Notas</TableHead>
+                  <TableHead>Razón / Notas</TableHead>
                   <TableHead>Fecha</TableHead>
                 </TableRow>
               </TableHeader>
@@ -112,6 +112,12 @@ export function MovementHistory({
                   const Icon = iconsByType[mov.type as MovementType];
                   const color = colorsByType[mov.type as MovementType];
                   const label = labelsByType[mov.type as MovementType];
+                  const reasonLabel =
+                    mov.reason === "merma"
+                      ? "Merma"
+                      : mov.reason === "muestra"
+                        ? `Muestra${mov.sample_customer ? ` — ${mov.sample_customer.name}` : ""}`
+                        : null;
                   return (
                     <TableRow key={mov.id}>
                       <TableCell>
@@ -123,8 +129,13 @@ export function MovementHistory({
                       <TableCell className="text-right font-medium">
                         {mov.type === "outbound" ? "-" : "+"}{mov.quantity}
                       </TableCell>
-                      <TableCell className="text-[#64748B] max-w-[200px] truncate">
-                        {mov.notes || "—"}
+                      <TableCell className="text-[#64748B] max-w-[220px]">
+                        {reasonLabel && (
+                          <span className="block text-xs font-medium text-[#1E293B]">
+                            {reasonLabel}
+                          </span>
+                        )}
+                        <span className="truncate block">{mov.notes || "—"}</span>
                       </TableCell>
                       <TableCell className="text-[#64748B] text-sm">
                         {formatDate(mov.created_at)}

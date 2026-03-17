@@ -1,9 +1,15 @@
 import { listCustomers } from "@/actions/customers";
+import { listAllCouriers } from "@/actions/couriers";
 import { CustomersTable } from "@/components/admin/customers/customers-table";
 
 export default async function CustomersPage() {
-  const result = await listCustomers();
-  const customers = result.data ?? [];
+  const [customersResult, couriersResult] = await Promise.all([
+    listCustomers(),
+    listAllCouriers(),
+  ]);
+
+  const customers = customersResult.data ?? [];
+  const couriers = (couriersResult.data ?? []).filter((c) => c.active);
 
   return (
     <div className="space-y-6">
@@ -13,7 +19,7 @@ export default async function CustomersPage() {
           Gestion de clientes y sus datos
         </p>
       </div>
-      <CustomersTable initialCustomers={customers} />
+      <CustomersTable initialCustomers={customers} couriers={couriers} />
     </div>
   );
 }

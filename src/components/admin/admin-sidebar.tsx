@@ -11,6 +11,7 @@ import {
   Users,
   Bike,
   LogOut,
+  MapPin,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ const navigation = [
   { label: "Inventario", href: "/inventory", icon: ClipboardList },
   { label: "Clientes", href: "/customers", icon: Users },
   { label: "Domiciliarios", href: "/couriers", icon: Bike },
+  { label: "Zonas", href: "/zones", icon: MapPin },
   { label: "Reportes", href: "/reports", icon: FileBarChart },
 ];
 

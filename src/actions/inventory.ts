@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { verifyAdmin } from "@/lib/auth-helpers";
 import {
   productSchema,
+  registerOutboundSchema,
   type ActionResponse,
   type Product,
   type InventoryMovement,
@@ -50,6 +51,7 @@ export async function createProduct(
 
   const raw = {
     name: formData.get("name"),
+    codigo: (formData.get("codigo") as string) || undefined,
     description: formData.get("description") || undefined,
     price: Number(formData.get("price")),
     stock: Number(formData.get("stock")),
@@ -61,15 +63,25 @@ export async function createProduct(
     return { success: false, error: result.error.issues[0].message };
   }
 
+  // Normalizar código a mayúsculas para consistencia
+  const dataToInsert = {
+    ...result.data,
+    codigo: result.data.codigo?.toUpperCase() ?? null,
+    admin_id: ctx.user.id,
+  };
+
   const { data, error } = await ctx.supabase
     .from("products")
-    .insert({ ...result.data, admin_id: ctx.user.id })
+    .insert(dataToInsert)
     .select()
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "Ya existe un producto con ese código" };
+    }
     logError("create_product", error);
-    return { success: false, error: "Error creating product" };
+    return { success: false, error: "Error al crear producto" };
   }
 
   if (result.data.stock > 0) {
@@ -97,6 +109,7 @@ export async function updateProduct(
 
   const raw = {
     name: formData.get("name"),
+    codigo: (formData.get("codigo") as string) || undefined,
     description: formData.get("description") || undefined,
     price: Number(formData.get("price")),
     stock: Number(formData.get("stock")),
@@ -109,7 +122,11 @@ export async function updateProduct(
   }
 
   // Don't update stock directly, only basic data
-  const { stock: _stock, ...dataToUpdate } = result.data;
+  const { stock: _stock, ...rest } = result.data;
+  const dataToUpdate = {
+    ...rest,
+    codigo: rest.codigo?.toUpperCase() ?? null,
+  };
 
   const { error } = await ctx.supabase
     .from("products")
@@ -117,8 +134,11 @@ export async function updateProduct(
     .eq("id", productId);
 
   if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "Ya existe un producto con ese código" };
+    }
     logError("update_product", error, { product_id: productId });
-    return { success: false, error: "Error updating product" };
+    return { success: false, error: "Error al actualizar producto" };
   }
 
   logOperacion("product_updated", { product_id: productId, ...dataToUpdate }, ctx.user.id);
@@ -212,7 +232,7 @@ export async function listMovements(
 
   const { data, error } = await ctx.supabase
     .from("inventory_movements")
-    .select("*")
+    .select("*, sample_customer:customers(id, name)")
     .eq("product_id", productId)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -223,4 +243,67 @@ export async function listMovements(
   }
 
   return { success: true, data: data as InventoryMovement[] };
+}
+
+export async function registerOutbound(
+  _prevState: ActionResponse,
+  formData: FormData
+): Promise<ActionResponse> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const raw = {
+    product_id: formData.get("product_id") as string,
+    quantity: Number(formData.get("quantity")),
+    reason: formData.get("reason") as string,
+    customer_id: (formData.get("customer_id") as string) || undefined,
+    notes: (formData.get("notes") as string) || undefined,
+  };
+
+  const result = registerOutboundSchema.safeParse(raw);
+  if (!result.success) {
+    return { success: false, error: result.error.issues[0].message };
+  }
+
+  // Verificar que el producto pertenece al admin (seguridad extra)
+  const { data: product } = await ctx.supabase
+    .from("products")
+    .select("id, name, stock")
+    .eq("id", result.data.product_id)
+    .eq("admin_id", ctx.user.id)
+    .single();
+
+  if (!product) {
+    return { success: false, error: "Producto no encontrado" };
+  }
+
+  const { error } = await ctx.supabase.rpc("register_outbound", {
+    p_product_id: result.data.product_id,
+    p_quantity: result.data.quantity,
+    p_reason: result.data.reason,
+    p_customer_id: result.data.customer_id ?? null,
+    p_notes: result.data.notes ?? null,
+    p_admin_id: ctx.user.id,
+  });
+
+  if (error) {
+    logError("register_outbound", error, { product_id: result.data.product_id });
+    return { success: false, error: error.message };
+  }
+
+  logOperacion(
+    "outbound_registered",
+    {
+      product_id: result.data.product_id,
+      product_name: product.name,
+      quantity: result.data.quantity,
+      reason: result.data.reason,
+      customer_id: result.data.customer_id,
+      previous_stock: product.stock,
+    },
+    ctx.user.id
+  );
+
+  revalidatePath("/inventory");
+  return { success: true };
 }

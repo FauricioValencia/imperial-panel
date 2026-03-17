@@ -33,10 +33,13 @@ export const customerSchema = z.object({
   name: z.string().min(2, "Name required"),
   phone: z.string().optional(),
   address: z.string().optional(),
+  reference_code: z.string().min(1).optional(),
+  preferred_courier_id: z.string().uuid().optional(),
 });
 
 export const productSchema = z.object({
   name: z.string().min(2, "Name required"),
+  codigo: z.string().min(1).optional(),
   description: z.string().optional(),
   price: z.number().positive("Price must be positive"),
   stock: z.number().int().min(0, "Stock cannot be negative"),
@@ -83,11 +86,13 @@ export const courierSchema = z.object({
   name: z.string().min(2, "Nombre requerido"),
   email: z.string().email("Email invalido"),
   password: z.string().min(6, "Minimo 6 caracteres"),
+  zone_id: z.string().uuid().optional(),
 });
 
 export const updateCourierSchema = z.object({
   name: z.string().min(2, "Nombre requerido"),
   email: z.string().email("Email invalido"),
+  zone_id: z.string().uuid().optional(),
 });
 
 export const cashClosingSchema = z.object({
@@ -105,6 +110,31 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z.object({
   name: z.string().min(2, "Nombre requerido"),
   email: z.string().email("Email invalido"),
+});
+
+export const zoneSchema = z.object({
+  name: z.string().min(2, "Nombre requerido").max(100),
+  description: z.string().optional(),
+});
+
+export const registerOutboundSchema = z
+  .object({
+    product_id: z.string().uuid(),
+    quantity: z.number().int().positive("Cantidad debe ser mayor a cero"),
+    reason: z.enum(["merma", "muestra"]),
+    customer_id: z.string().uuid().optional(),
+    notes: z.string().optional(),
+  })
+  .refine((d) => d.reason !== "muestra" || !!d.customer_id, {
+    message: "Se requiere cliente para salidas tipo muestra",
+    path: ["customer_id"],
+  });
+
+export const reportFiltersSchema = z.object({
+  courier_id: z.string().uuid().optional(),
+  product_id: z.string().uuid().optional(),
+  year: z.number().int(),
+  month: z.number().int().min(1).max(12).optional(),
 });
 
 export const businessConfigSchema = z.object({
@@ -133,6 +163,9 @@ export type CashClosingInput = z.infer<typeof cashClosingSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type BusinessConfigInput = z.infer<typeof businessConfigSchema>;
+export type ZoneInput = z.infer<typeof zoneSchema>;
+export type RegisterOutboundInput = z.infer<typeof registerOutboundSchema>;
+export type ReportFilters = z.infer<typeof reportFiltersSchema>;
 
 // ============================================
 // Database types
@@ -151,7 +184,9 @@ export interface User {
   role: UserRole;
   admin_id: string | null;
   active: boolean;
+  zone_id: string | null;
   created_at: string;
+  zone?: Zone;
 }
 
 export interface Customer {
@@ -162,12 +197,16 @@ export interface Customer {
   pending_balance: number;
   admin_id: string;
   active: boolean;
+  reference_code: string | null;
+  preferred_courier_id: string | null;
   created_at: string;
+  preferred_courier?: User;
 }
 
 export interface Product {
   id: string;
   name: string;
+  codigo: string | null;
   description: string | null;
   price: number;
   stock: number;
@@ -225,9 +264,12 @@ export interface InventoryMovement {
   type: MovementType;
   quantity: number;
   order_reference: string | null;
+  reason: string | null;
+  sample_customer_id: string | null;
   notes: string | null;
   admin_id: string;
   created_at: string;
+  sample_customer?: Customer;
 }
 
 export interface CashClosing {
@@ -253,6 +295,28 @@ export interface BusinessConfig {
   logo_url: string | null;
   admin_id: string;
   updated_at: string;
+}
+
+export interface Zone {
+  id: string;
+  name: string;
+  description: string | null;
+  admin_id: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface SalesByMonthReport {
+  courier_id: string;
+  courier_name: string;
+  year: number;
+  month: number;
+  product_id: string | null;
+  product_name: string | null;
+  product_codigo: string | null;
+  total_orders: number;
+  total_items: number;
+  total_amount: number;
 }
 
 // ============================================

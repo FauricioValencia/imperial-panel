@@ -62,15 +62,28 @@ export function ProductForm({ open, onClose, product }: ProductFormProps) {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Nombre *</Label>
-            <Input
-              id="name"
-              name="name"
-              required
-              defaultValue={product?.name ?? ""}
-              disabled={isPending}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre *</Label>
+              <Input
+                id="name"
+                name="name"
+                required
+                defaultValue={product?.name ?? ""}
+                disabled={isPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="codigo">Código</Label>
+              <Input
+                id="codigo"
+                name="codigo"
+                placeholder="Ej: PROD-001"
+                defaultValue={product?.codigo ?? ""}
+                disabled={isPending}
+                className="uppercase"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

@@ -1,7 +1,16 @@
 import { listMyHistory } from "@/actions/orders";
+import { getMyCourierStats } from "@/actions/reports";
+import { getCurrentUser } from "@/actions/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, CheckCircle, Undo2, AlertTriangle } from "lucide-react";
+import {
+  Package,
+  CheckCircle,
+  Undo2,
+  AlertTriangle,
+  TrendingUp,
+  ShoppingBag,
+} from "lucide-react";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CO", {
@@ -26,14 +35,66 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   partial: { label: "Parcial", color: "bg-orange-100 text-orange-700", icon: AlertTriangle },
 };
 
+const MONTHS = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
 export default async function HistoryPage() {
-  const result = await listMyHistory();
-  const orders = result.data ?? [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  // Obtener usuario primero para tener el ID disponible en todas las queries
+  const user = await getCurrentUser();
+
+  const [historyResult, statsResult] = await Promise.all([
+    listMyHistory(),
+    user
+      ? getMyCourierStats({ courierId: user.id, year: currentYear, month: currentMonth })
+      : Promise.resolve({ success: false as const, error: "No autenticado" }),
+  ]);
+
+  const orders = historyResult.data ?? [];
+  const stats = statsResult.success ? statsResult.data : null;
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-[#1E293B]">Historial</h2>
 
+      {/* Estadísticas del mes */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B] mb-3">
+          Mis ventas — {MONTHS[currentMonth - 1]} {currentYear}
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+            <ShoppingBag className="h-8 w-8 text-[#3B82F6] shrink-0" />
+            <div>
+              <p className="text-xs text-[#64748B]">Entregas</p>
+              <p className="text-2xl font-bold text-[#1E293B]">
+                {stats?.total_orders ?? 0}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
+            <TrendingUp className="h-8 w-8 text-[#10B981] shrink-0" />
+            <div>
+              <p className="text-xs text-[#64748B]">Total</p>
+              <p className="text-lg font-bold text-[#10B981]">
+                {formatCurrency(stats?.total_amount ?? 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+        {user?.zone && (
+          <p className="mt-3 text-xs text-[#64748B]">
+            Zona: <span className="font-medium text-[#1E293B]">{user.zone.name}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Lista de historial */}
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Package className="h-12 w-12 text-[#64748B] mb-3" />

@@ -1,9 +1,15 @@
 import { listAllCouriers } from "@/actions/couriers";
+import { listZones } from "@/actions/zones";
 import { CouriersTable } from "@/components/admin/couriers/couriers-table";
 
 export default async function CouriersPage() {
-  const result = await listAllCouriers();
-  const couriers = result.data ?? [];
+  const [couriersResult, zonesResult] = await Promise.all([
+    listAllCouriers(),
+    listZones(),
+  ]);
+
+  const couriers = couriersResult.data ?? [];
+  const zones = zonesResult.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -13,7 +19,7 @@ export default async function CouriersPage() {
           Gestion de mensajeros y domiciliarios
         </p>
       </div>
-      <CouriersTable initialCouriers={couriers} />
+      <CouriersTable initialCouriers={couriers} zones={zones} />
     </div>
   );
 }

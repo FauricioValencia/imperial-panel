@@ -1,24 +1,25 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { listAllCouriers } from "@/actions/couriers";
+import { listProducts } from "@/actions/inventory";
+import { SalesReport } from "@/components/admin/reports/sales-report";
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  const [couriersResult, productsResult] = await Promise.all([
+    listAllCouriers(),
+    listProducts(),
+  ]);
+
+  const couriers = couriersResult.data ?? [];
+  const products = productsResult.data ?? [];
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-[#1E293B]">Reportes</h2>
         <p className="text-sm text-[#64748B]">
-          Reportes y estadisticas del negocio
+          Estadísticas de ventas y entregas
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Reportes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-[#64748B]">
-            Modulo de reportes en desarrollo.
-          </p>
-        </CardContent>
-      </Card>
+      <SalesReport couriers={couriers} products={products} />
     </div>
   );
 }

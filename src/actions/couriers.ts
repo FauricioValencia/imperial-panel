@@ -18,7 +18,7 @@ export async function listAllCouriers(): Promise<ActionResponse<User[]>> {
 
   const { data, error } = await ctx.supabase
     .from("users")
-    .select("*")
+    .select("*, zone:zones(id, name)")
     .eq("role", "courier")
     .eq("admin_id", ctx.user.id)
     .order("name");
@@ -42,11 +42,26 @@ export async function createCourier(
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    zone_id: (formData.get("zone_id") as string) || undefined,
   };
 
   const result = courierSchema.safeParse(raw);
   if (!result.success) {
     return { success: false, error: result.error.issues[0].message };
+  }
+
+  // Verificar que la zona pertenece al admin (si se especificó)
+  if (result.data.zone_id) {
+    const { data: zone } = await ctx.supabase
+      .from("zones")
+      .select("id")
+      .eq("id", result.data.zone_id)
+      .eq("admin_id", ctx.user.id)
+      .single();
+
+    if (!zone) {
+      return { success: false, error: "Zona no válida" };
+    }
   }
 
   // Create auth user via service role client
@@ -75,6 +90,7 @@ export async function createCourier(
       role: "courier",
       active: true,
       admin_id: ctx.user.id,
+      zone_id: result.data.zone_id ?? null,
     });
 
   if (insertError) {
@@ -104,6 +120,7 @@ export async function updateCourier(
   const raw = {
     name: formData.get("name"),
     email: formData.get("email"),
+    zone_id: (formData.get("zone_id") as string) || undefined,
   };
 
   const result = updateCourierSchema.safeParse(raw);
@@ -111,10 +128,28 @@ export async function updateCourier(
     return { success: false, error: result.error.issues[0].message };
   }
 
+  // Verificar que la zona pertenece al admin (si se especificó)
+  if (result.data.zone_id) {
+    const { data: zone } = await ctx.supabase
+      .from("zones")
+      .select("id")
+      .eq("id", result.data.zone_id)
+      .eq("admin_id", ctx.user.id)
+      .single();
+
+    if (!zone) {
+      return { success: false, error: "Zona no válida" };
+    }
+  }
+
   // Update users table
   const { error } = await ctx.supabase
     .from("users")
-    .update({ name: result.data.name, email: result.data.email })
+    .update({
+      name: result.data.name,
+      email: result.data.email,
+      zone_id: result.data.zone_id ?? null,
+    })
     .eq("id", courierId);
 
   if (error) {

@@ -1,9 +1,15 @@
 import { listProducts } from "@/actions/inventory";
+import { listCustomers } from "@/actions/customers";
 import { ProductsTable } from "@/components/admin/inventory/products-table";
 
 export default async function InventoryPage() {
-  const result = await listProducts();
-  const products = result.data ?? [];
+  const [productsResult, customersResult] = await Promise.all([
+    listProducts(),
+    listCustomers(),
+  ]);
+
+  const products = productsResult.data ?? [];
+  const customers = customersResult.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -13,7 +19,7 @@ export default async function InventoryPage() {
           Productos, stock y movimientos
         </p>
       </div>
-      <ProductsTable initialProducts={products} />
+      <ProductsTable initialProducts={products} customers={customers} />
     </div>
   );
 }

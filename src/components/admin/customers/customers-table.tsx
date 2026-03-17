@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { CustomerForm } from "./customer-form";
 import { deactivateCustomer } from "@/actions/customers";
-import type { Customer } from "@/types";
+import type { Customer, User } from "@/types";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CO", {
@@ -35,9 +35,10 @@ function formatCurrency(value: number): string {
 
 interface CustomersTableProps {
   initialCustomers: Customer[];
+  couriers?: User[];
 }
 
-export function CustomersTable({ initialCustomers }: CustomersTableProps) {
+export function CustomersTable({ initialCustomers, couriers = [] }: CustomersTableProps) {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -96,9 +97,10 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Código</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Telefono</TableHead>
-              <TableHead>Direccion</TableHead>
+              <TableHead>Domiciliario</TableHead>
               <TableHead className="text-right">Saldo Pendiente</TableHead>
               <TableHead className="w-[100px]">Acciones</TableHead>
             </TableRow>
@@ -106,21 +108,26 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-[#64748B]">
+                <TableCell colSpan={6} className="text-center text-[#64748B]">
                   {search ? "No se encontraron clientes" : "No hay clientes registrados"}
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((customer) => (
                 <TableRow key={customer.id}>
+                  <TableCell className="text-[#64748B] font-mono text-xs">
+                    {customer.reference_code || "—"}
+                  </TableCell>
                   <TableCell className="font-medium text-[#1E293B]">
                     {customer.name}
                   </TableCell>
                   <TableCell className="text-[#64748B]">
                     {customer.phone || "—"}
                   </TableCell>
-                  <TableCell className="text-[#64748B] max-w-[200px] truncate">
-                    {customer.address || "—"}
+                  <TableCell className="text-[#64748B] text-sm">
+                    {customer.preferred_courier
+                      ? customer.preferred_courier.name
+                      : couriers.find((c) => c.id === customer.preferred_courier_id)?.name || "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     {customer.pending_balance > 0 ? (
@@ -163,6 +170,7 @@ export function CustomersTable({ initialCustomers }: CustomersTableProps) {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         customer={editingCustomer}
+        couriers={couriers}
       />
 
       <Dialog open={!!deletingCustomer} onOpenChange={(open) => !open && setDeletingCustomer(null)}>

@@ -7,6 +7,7 @@ import {
   Plus,
   Search,
   PackagePlus,
+  PackageMinus,
   History,
   AlertTriangle,
 } from "lucide-react";
@@ -37,9 +38,10 @@ import {
 } from "@/components/ui/tooltip";
 import { ProductForm } from "./product-form";
 import { StockEntryDialog } from "./stock-entry-dialog";
+import { OutboundDialog } from "./outbound-dialog";
 import { MovementHistory } from "./movement-history";
 import { deactivateProduct } from "@/actions/inventory";
-import type { Product } from "@/types";
+import type { Customer, Product } from "@/types";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CO", {
@@ -51,14 +53,16 @@ function formatCurrency(value: number): string {
 
 interface ProductsTableProps {
   initialProducts: Product[];
+  customers?: Customer[];
 }
 
-export function ProductsTable({ initialProducts }: ProductsTableProps) {
+export function ProductsTable({ initialProducts, customers = [] }: ProductsTableProps) {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [entryProduct, setEntryProduct] = useState<Product | null>(null);
+  const [outboundProduct, setOutboundProduct] = useState<Product | null>(null);
   const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -126,17 +130,18 @@ export function ProductsTable({ initialProducts }: ProductsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Código</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Descripcion</TableHead>
               <TableHead className="text-right">Precio</TableHead>
               <TableHead className="text-center">Stock</TableHead>
-              <TableHead className="w-[140px]">Acciones</TableHead>
+              <TableHead className="w-[160px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-[#64748B]">
+                <TableCell colSpan={6} className="text-center text-[#64748B]">
                   {search ? "No se encontraron productos" : "No hay productos registrados"}
                 </TableCell>
               </TableRow>
@@ -147,6 +152,9 @@ export function ProductsTable({ initialProducts }: ProductsTableProps) {
 
                 return (
                   <TableRow key={product.id}>
+                    <TableCell className="text-[#64748B] font-mono text-xs">
+                      {product.codigo || "—"}
+                    </TableCell>
                     <TableCell className="font-medium text-[#1E293B]">
                       {product.name}
                     </TableCell>
@@ -182,6 +190,19 @@ export function ProductsTable({ initialProducts }: ProductsTableProps) {
                               </button>
                             </TooltipTrigger>
                             <TooltipContent>Registrar entrada</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => setOutboundProduct(product)}
+                                className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#F59E0B]"
+                                disabled={product.stock === 0}
+                              >
+                                <PackageMinus className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Registrar salida (merma/muestra)</TooltipContent>
                           </Tooltip>
 
                           <Tooltip>
@@ -241,6 +262,15 @@ export function ProductsTable({ initialProducts }: ProductsTableProps) {
         onClose={() => setEntryProduct(null)}
         product={entryProduct}
       />
+
+      {outboundProduct && (
+        <OutboundDialog
+          open={!!outboundProduct}
+          onClose={() => setOutboundProduct(null)}
+          product={outboundProduct}
+          customers={customers}
+        />
+      )}
 
       <MovementHistory
         open={!!history}
