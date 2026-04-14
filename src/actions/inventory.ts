@@ -80,18 +80,21 @@ export async function createProduct(
     if (error.code === "23505") {
       return { success: false, error: "Ya existe un producto con ese código" };
     }
-    logError("create_product", error);
-    return { success: false, error: "Error al crear producto" };
+    logError("create_product", error, { dataToInsert });
+    return { success: false, error: `Error al crear producto: ${error.message}` };
   }
 
   if (result.data.stock > 0) {
-    await ctx.supabase.from("inventory_movements").insert({
+    const { error: movError } = await ctx.supabase.from("inventory_movements").insert({
       product_id: data.id,
       type: "inbound",
       quantity: result.data.stock,
       notes: "Initial stock on product creation",
       admin_id: ctx.user.id,
     });
+    if (movError) {
+      logError("create_product_initial_movement", movError, { product_id: data.id });
+    }
   }
 
   logOperacion("product_created", { product_id: data.id, name: data.name }, ctx.user.id);

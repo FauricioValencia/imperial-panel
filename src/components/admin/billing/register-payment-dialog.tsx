@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   Select,
   SelectContent,
@@ -20,15 +20,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { registerPayment } from "@/actions/billing";
+import { formatCurrency } from "@/lib/format";
 import type { Order, PaymentMethod, PaymentType } from "@/types";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface RegisterPaymentDialogProps {
   open: boolean;
@@ -46,7 +39,7 @@ export function RegisterPaymentDialog({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(0);
   const [type, setType] = useState<PaymentType | "">("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
 
@@ -60,14 +53,12 @@ export function RegisterPaymentDialog({
       return;
     }
 
-    const numAmount = Number(amount);
-
-    if (!numAmount || numAmount <= 0) {
+    if (!amount || amount <= 0) {
       setError("Ingresa un monto valido");
       return;
     }
 
-    if (numAmount > remaining + 0.01) {
+    if (amount > remaining + 0.01) {
       setError(`El monto excede el saldo pendiente (${formatCurrency(remaining)})`);
       return;
     }
@@ -75,13 +66,13 @@ export function RegisterPaymentDialog({
     startTransition(async () => {
       const result = await registerPayment({
         order_id: order.id,
-        amount: numAmount,
+        amount,
         type,
         payment_method: method,
       });
 
       if (result.success) {
-        setAmount("");
+        setAmount(0);
         setType("");
         setMethod("cash");
         onClose();
@@ -93,7 +84,7 @@ export function RegisterPaymentDialog({
   }
 
   function handleClose() {
-    setAmount("");
+    setAmount(0);
     setError("");
     setType("");
     setMethod("cash");
@@ -104,9 +95,9 @@ export function RegisterPaymentDialog({
     const newType = val as PaymentType;
     setType(newType);
     if (newType === "full") {
-      setAmount(String(remaining));
+      setAmount(remaining);
     } else {
-      setAmount("");
+      setAmount(0);
     }
   }
 
@@ -144,12 +135,11 @@ export function RegisterPaymentDialog({
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-[#1E293B]">Monto</label>
-            <Input
-              type="number"
+            <CurrencyInput
               min={1}
               max={remaining}
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={setAmount}
               placeholder="Monto del pago"
               disabled={!type || type === "full"}
             />
@@ -177,7 +167,7 @@ export function RegisterPaymentDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending || !type || !amount}
+            disabled={isPending || !type || amount <= 0}
             className="bg-[#10B981] hover:bg-[#059669]"
           >
             {isPending ? "Registrando..." : "Registrar pago"}

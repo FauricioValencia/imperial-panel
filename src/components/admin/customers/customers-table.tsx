@@ -23,15 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { CustomerForm } from "./customer-form";
 import { deactivateCustomer } from "@/actions/customers";
+import { formatCurrency } from "@/lib/format";
 import type { Customer, User } from "@/types";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface CustomersTableProps {
   initialCustomers: Customer[];

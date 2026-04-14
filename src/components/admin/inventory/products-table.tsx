@@ -41,15 +41,8 @@ import { StockEntryDialog } from "./stock-entry-dialog";
 import { OutboundDialog } from "./outbound-dialog";
 import { MovementHistory } from "./movement-history";
 import { deactivateProduct } from "@/actions/inventory";
+import { formatCurrency } from "@/lib/format";
 import type { Customer, Product } from "@/types";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface ProductsTableProps {
   initialProducts: Product[];

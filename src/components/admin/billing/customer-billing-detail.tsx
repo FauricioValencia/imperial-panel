@@ -14,15 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RegisterPaymentDialog } from "./register-payment-dialog";
+import { formatCurrency } from "@/lib/format";
 import type { Customer, Order, Payment } from "@/types";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {

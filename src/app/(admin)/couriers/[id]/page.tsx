@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/format";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   assigned: { label: "Asignado", color: "bg-blue-100 text-blue-700" },
@@ -24,14 +25,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   returned: { label: "Devuelto", color: "bg-red-100 text-red-700" },
   partial: { label: "Parcial", color: "bg-orange-100 text-orange-700" },
 };
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {

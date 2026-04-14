@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { assignCourier } from "@/actions/orders";
+import { formatCurrency } from "@/lib/format";
 import type { Order, User } from "@/types";
 
 interface AssignCourierDialogProps {
@@ -61,7 +62,7 @@ export function AssignCourierDialog({
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">Asignar Domiciliario</DialogTitle>
           <DialogDescription>
-            Pedido para <strong>{order?.customer?.name}</strong> — Total: {order ? new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(order.total) : ""}
+            Pedido para <strong>{order?.customer?.name}</strong> — Total: {order ? formatCurrency(order.total) : ""}
           </DialogDescription>
         </DialogHeader>
 

@@ -8,20 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { markInTransit } from "@/actions/orders";
 import { ConfirmDeliveryDialog } from "./confirm-delivery-dialog";
+import { formatCurrency } from "@/lib/format";
 import type { Order } from "@/types";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   assigned: { label: "Asignado", color: "bg-blue-100 text-blue-700" },
   in_transit: { label: "En camino", color: "bg-amber-100 text-amber-700" },
 };
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface DeliveryCardProps {
   order: Order;

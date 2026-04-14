@@ -11,14 +11,7 @@ import {
   TrendingUp,
   ShoppingBag,
 } from "lucide-react";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
+import { formatCurrency } from "@/lib/format";
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {

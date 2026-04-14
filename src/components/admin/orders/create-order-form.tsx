@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createOrder } from "@/actions/orders";
+import { formatCurrency } from "@/lib/format";
 import type { Customer, Product } from "@/types";
 
 interface OrderItem {
@@ -31,14 +32,6 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   max_stock: number;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
 }
 
 interface CreateOrderFormProps {

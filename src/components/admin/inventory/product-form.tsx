@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { createProduct, updateProduct } from "@/actions/inventory";
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -100,15 +101,13 @@ export function ProductForm({ open, onClose, product }: ProductFormProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="price">Precio *</Label>
-              <Input
+              <CurrencyInput
                 id="price"
                 name="price"
-                type="number"
-                min="0"
-                step="1"
                 required
                 defaultValue={product?.price ?? ""}
                 disabled={isPending}
+                placeholder="0"
               />
             </div>
 

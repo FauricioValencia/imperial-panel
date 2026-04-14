@@ -3,14 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Wallet, Bike, AlertTriangle, TrendingUp, CheckCircle } from "lucide-react";
 import { getDashboardMetrics, getRecentOrders, getTopDebtors } from "@/actions/dashboard";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
+import { formatCurrency } from "@/lib/format";
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {

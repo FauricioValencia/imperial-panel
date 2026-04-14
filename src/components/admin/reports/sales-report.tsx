@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSalesByMonth } from "@/actions/reports";
+import { formatCurrency } from "@/lib/format";
 import type { SalesByMonthReport, User, Product } from "@/types";
 
 const MONTHS = [
@@ -37,14 +38,6 @@ const MONTHS = [
   { value: "11", label: "Noviembre" },
   { value: "12", label: "Diciembre" },
 ];
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface SalesReportProps {
   couriers: User[];

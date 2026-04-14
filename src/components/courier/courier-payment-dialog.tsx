@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   Dialog,
   DialogContent,
@@ -14,15 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { registerPayment } from "@/actions/billing";
+import { formatCurrency } from "@/lib/format";
 import type { Order } from "@/types";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface CourierPaymentDialogProps {
   open: boolean;
@@ -41,10 +34,10 @@ export function CourierPaymentDialog({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"full" | "partial" | null>(null);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(0);
 
   const totalToPay = deliveredTotal ?? order.total;
-  const numAmount = Number(amount) || 0;
+  const numAmount = amount;
   const pendingAfterPayment = totalToPay - numAmount;
 
   function handleFullPayment() {
@@ -101,7 +94,7 @@ export function CourierPaymentDialog({
 
   function handleClose() {
     setMode(null);
-    setAmount("");
+    setAmount(0);
     setError("");
     onClose();
   }
@@ -178,15 +171,13 @@ export function CourierPaymentDialog({
               <label className="text-sm font-medium text-[#1E293B]">
                 Cuanto te pagaron?
               </label>
-              <Input
-                type="number"
+              <CurrencyInput
                 min={1}
                 max={totalToPay}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onValueChange={setAmount}
                 placeholder="Monto recibido"
                 className="text-lg min-h-[44px]"
-                autoFocus
               />
             </div>
 
@@ -219,7 +210,7 @@ export function CourierPaymentDialog({
                 {isPending ? "Registrando..." : "Registrar abono"}
               </Button>
               <Button
-                onClick={() => { setMode(null); setAmount(""); }}
+                onClick={() => { setMode(null); setAmount(0); }}
                 disabled={isPending}
                 variant="outline"
                 className="w-full min-h-[44px]"

@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { formatCurrency } from "@/lib/format";
 
 const styles = StyleSheet.create({
   page: {
@@ -101,14 +102,6 @@ const styles = StyleSheet.create({
   red: { color: "#EF4444" },
   green: { color: "#10B981" },
 });
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {

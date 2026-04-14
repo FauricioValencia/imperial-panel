@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AssignCourierDialog } from "./assign-courier-dialog";
+import { formatCurrency } from "@/lib/format";
 import type { Order, User } from "@/types";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -32,14 +33,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   returned: { label: "Devuelto", color: "bg-red-100 text-red-700" },
   partial: { label: "Parcial", color: "bg-orange-100 text-orange-700" },
 };
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {

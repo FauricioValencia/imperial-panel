@@ -12,15 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { confirmDelivery } from "@/actions/orders";
+import { formatCurrency } from "@/lib/format";
 import type { Order } from "@/types";
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(value);
-}
 
 interface ConfirmDeliveryDialogProps {
   open: boolean;
