@@ -18,7 +18,7 @@ export async function listUsers(): Promise<ActionResponse<User[]>> {
   const { data, error } = await ctx.supabase
     .from("users")
     .select("*")
-    .in("role", ["admin", "courier"])
+    .in("role", ["admin", "courier", "commercial"])
     .order("role")
     .order("name");
 
@@ -188,7 +188,7 @@ export async function getUserStats(): Promise<ActionResponse<{ admins: number; c
   const { data, error } = await ctx.supabase
     .from("users")
     .select("role, active")
-    .in("role", ["admin", "courier"]);
+    .in("role", ["admin", "courier", "commercial"]);
 
   if (error) {
     logError("get_user_stats", error);

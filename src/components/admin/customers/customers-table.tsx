@@ -29,9 +29,14 @@ import type { Customer, User } from "@/types";
 interface CustomersTableProps {
   initialCustomers: Customer[];
   couriers?: User[];
+  commercials?: User[];
 }
 
-export function CustomersTable({ initialCustomers, couriers = [] }: CustomersTableProps) {
+export function CustomersTable({
+  initialCustomers,
+  couriers = [],
+  commercials = [],
+}: CustomersTableProps) {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -94,6 +99,7 @@ export function CustomersTable({ initialCustomers, couriers = [] }: CustomersTab
               <TableHead>Nombre</TableHead>
               <TableHead>Telefono</TableHead>
               <TableHead>Domiciliario</TableHead>
+              <TableHead>Comercial</TableHead>
               <TableHead className="text-right">Saldo Pendiente</TableHead>
               <TableHead className="w-[100px]">Acciones</TableHead>
             </TableRow>
@@ -101,7 +107,7 @@ export function CustomersTable({ initialCustomers, couriers = [] }: CustomersTab
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-[#64748B]">
+                <TableCell colSpan={7} className="text-center text-[#64748B]">
                   {search ? "No se encontraron clientes" : "No hay clientes registrados"}
                 </TableCell>
               </TableRow>
@@ -121,6 +127,11 @@ export function CustomersTable({ initialCustomers, couriers = [] }: CustomersTab
                     {customer.preferred_courier
                       ? customer.preferred_courier.name
                       : couriers.find((c) => c.id === customer.preferred_courier_id)?.name || "—"}
+                  </TableCell>
+                  <TableCell className="text-[#64748B] text-sm">
+                    {customer.commercial
+                      ? customer.commercial.name
+                      : commercials.find((c) => c.id === customer.commercial_id)?.name || "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     {customer.pending_balance > 0 ? (
@@ -164,6 +175,7 @@ export function CustomersTable({ initialCustomers, couriers = [] }: CustomersTab
         onClose={() => setFormOpen(false)}
         customer={editingCustomer}
         couriers={couriers}
+        commercials={commercials}
       />
 
       <Dialog open={!!deletingCustomer} onOpenChange={(open) => !open && setDeletingCustomer(null)}>

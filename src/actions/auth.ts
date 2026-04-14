@@ -56,6 +56,10 @@ export async function signIn(
     redirect("/admin-panel");
   }
 
+  if (user.role === "commercial") {
+    redirect("/my-customers");
+  }
+
   redirect("/dashboard");
 }
 

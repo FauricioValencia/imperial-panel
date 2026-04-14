@@ -37,6 +37,7 @@ export async function createCustomer(
   if (!ctx) return { success: false, error: "Unauthorized" };
 
   const rawCourierId = formData.get("preferred_courier_id") as string | null;
+  const rawCommercialId = formData.get("commercial_id") as string | null;
 
   const raw = {
     name: formData.get("name"),
@@ -44,6 +45,7 @@ export async function createCustomer(
     address: formData.get("address") || undefined,
     reference_code: (formData.get("reference_code") as string) || undefined,
     preferred_courier_id: rawCourierId || undefined,
+    commercial_id: rawCommercialId || undefined,
   };
 
   const result = customerSchema.safeParse(raw);
@@ -63,6 +65,21 @@ export async function createCustomer(
 
     if (!courier) {
       return { success: false, error: "Domiciliario no válido" };
+    }
+  }
+
+  // Verificar que el comercial pertenece al mismo admin y está activo
+  if (result.data.commercial_id) {
+    const { data: commercial } = await ctx.supabase
+      .from("users")
+      .select("id, active")
+      .eq("id", result.data.commercial_id)
+      .eq("admin_id", ctx.user.id)
+      .eq("role", "commercial")
+      .single();
+
+    if (!commercial || !commercial.active) {
+      return { success: false, error: "Comercial no válido" };
     }
   }
 
@@ -100,6 +117,7 @@ export async function updateCustomer(
   if (!ctx) return { success: false, error: "Unauthorized" };
 
   const rawCourierId = formData.get("preferred_courier_id") as string | null;
+  const rawCommercialId = formData.get("commercial_id") as string | null;
 
   const raw = {
     name: formData.get("name"),
@@ -107,6 +125,7 @@ export async function updateCustomer(
     address: formData.get("address") || undefined,
     reference_code: (formData.get("reference_code") as string) || undefined,
     preferred_courier_id: rawCourierId || undefined,
+    commercial_id: rawCommercialId || undefined,
   };
 
   const result = customerSchema.safeParse(raw);
@@ -129,11 +148,27 @@ export async function updateCustomer(
     }
   }
 
+  // Verificar que el comercial pertenece al mismo admin y está activo
+  if (result.data.commercial_id) {
+    const { data: commercial } = await ctx.supabase
+      .from("users")
+      .select("id, active")
+      .eq("id", result.data.commercial_id)
+      .eq("admin_id", ctx.user.id)
+      .eq("role", "commercial")
+      .single();
+
+    if (!commercial || !commercial.active) {
+      return { success: false, error: "Comercial no válido" };
+    }
+  }
+
   const dataToUpdate = {
     ...result.data,
     reference_code: result.data.reference_code?.toUpperCase() ?? null,
-    // Si se envía vacío, limpiar el campo
+    // Si se envía vacío, limpiar los campos
     preferred_courier_id: result.data.preferred_courier_id ?? null,
+    commercial_id: result.data.commercial_id ?? null,
   };
 
   const { error } = await ctx.supabase

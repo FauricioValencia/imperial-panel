@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, RotateCcw, Settings2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Droplet,
+  Gift,
+  RotateCcw,
+  Settings2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,29 +24,68 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { listMovements } from "@/actions/inventory";
 import type { InventoryMovement, MovementType } from "@/types";
 
-const iconsByType: Record<MovementType, typeof ArrowDownCircle> = {
-  inbound: ArrowDownCircle,
-  outbound: ArrowUpCircle,
-  return: RotateCcw,
-  adjustment: Settings2,
+type MovementCategory = "inbound" | "merma" | "muestra" | "return" | "adjustment";
+type FilterValue = "all" | "inbound" | "merma" | "muestra";
+
+interface CategoryStyle {
+  label: string;
+  icon: typeof ArrowDownCircle;
+  className: string;
+}
+
+const categoryStyles: Record<MovementCategory, CategoryStyle> = {
+  inbound: {
+    label: "Entrada",
+    icon: ArrowDownCircle,
+    // Verde #10B981
+    className: "bg-[#10B981]/15 text-[#047857] border-[#10B981]/30",
+  },
+  merma: {
+    label: "Merma",
+    icon: Droplet,
+    // Ámbar #F59E0B
+    className: "bg-[#F59E0B]/15 text-[#B45309] border-[#F59E0B]/30",
+  },
+  muestra: {
+    label: "Muestra",
+    icon: Gift,
+    // Azul #3B82F6
+    className: "bg-[#3B82F6]/15 text-[#1D4ED8] border-[#3B82F6]/30",
+  },
+  return: {
+    label: "Devolución",
+    icon: RotateCcw,
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  adjustment: {
+    label: "Ajuste",
+    icon: Settings2,
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
 };
 
-const colorsByType: Record<MovementType, string> = {
-  inbound: "bg-emerald-100 text-emerald-700",
-  outbound: "bg-red-100 text-red-700",
-  return: "bg-blue-100 text-blue-700",
-  adjustment: "bg-amber-100 text-amber-700",
-};
-
-const labelsByType: Record<MovementType, string> = {
-  inbound: "Entrada",
-  outbound: "Salida",
-  return: "Devolucion",
-  adjustment: "Ajuste",
-};
+function categorizeMovement(mov: InventoryMovement): MovementCategory {
+  const type = mov.type as MovementType;
+  if (type === "outbound") {
+    if (mov.reason === "merma") return "merma";
+    if (mov.reason === "muestra") return "muestra";
+    return "merma";
+  }
+  if (type === "inbound") return "inbound";
+  if (type === "return") return "return";
+  return "adjustment";
+}
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {
@@ -66,10 +112,12 @@ export function MovementHistory({
 }: MovementHistoryProps) {
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<FilterValue>("all");
 
   useEffect(() => {
     if (open && productId) {
       setLoading(true);
+      setFilter("all");
       listMovements(productId).then((res) => {
         if (res.success && res.data) {
           setMovements(res.data);
@@ -78,6 +126,14 @@ export function MovementHistory({
       });
     }
   }, [open, productId]);
+
+  const filteredMovements = useMemo(() => {
+    if (filter === "all") return movements;
+    return movements.filter((mov) => {
+      const category = categorizeMovement(mov);
+      return category === filter;
+    });
+  }, [movements, filter]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -97,54 +153,107 @@ export function MovementHistory({
             <p className="text-sm text-[#64748B]">No hay movimientos registrados</p>
           </div>
         ) : (
-          <div className="max-h-[400px] overflow-auto rounded-lg border border-slate-200">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead>Razón / Notas</TableHead>
-                  <TableHead>Fecha</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movements.map((mov) => {
-                  const Icon = iconsByType[mov.type as MovementType];
-                  const color = colorsByType[mov.type as MovementType];
-                  const label = labelsByType[mov.type as MovementType];
-                  const reasonLabel =
-                    mov.reason === "merma"
-                      ? "Merma"
-                      : mov.reason === "muestra"
-                        ? `Muestra${mov.sample_customer ? ` — ${mov.sample_customer.name}` : ""}`
-                        : null;
-                  return (
-                    <TableRow key={mov.id}>
-                      <TableCell>
-                        <Badge variant="secondary" className={color}>
-                          <Icon className="mr-1 h-3 w-3" />
-                          {label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {mov.type === "outbound" ? "-" : "+"}{mov.quantity}
-                      </TableCell>
-                      <TableCell className="text-[#64748B] max-w-[220px]">
-                        {reasonLabel && (
-                          <span className="block text-xs font-medium text-[#1E293B]">
-                            {reasonLabel}
-                          </span>
-                        )}
-                        <span className="truncate block">{mov.notes || "—"}</span>
-                      </TableCell>
-                      <TableCell className="text-[#64748B] text-sm">
-                        {formatDate(mov.created_at)}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="movement-filter" className="text-xs text-[#64748B]">
+                Filtrar por tipo
+              </Label>
+              <Select
+                value={filter}
+                onValueChange={(v) => setFilter(v as FilterValue)}
+              >
+                <SelectTrigger
+                  id="movement-filter"
+                  className="h-8 w-[180px] text-sm"
+                  aria-label="Filtrar movimientos por tipo"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="inbound">Entradas</SelectItem>
+                  <SelectItem value="merma">Mermas</SelectItem>
+                  <SelectItem value="muestra">Muestras</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-[#64748B]">
+                {filteredMovements.length} de {movements.length}
+              </span>
+            </div>
+
+            <div className="max-h-[400px] overflow-auto rounded-lg border border-slate-200">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Cantidad</TableHead>
+                    <TableHead>Detalle / Notas</TableHead>
+                    <TableHead>Fecha</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMovements.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="py-6 text-center text-sm text-[#64748B]"
+                      >
+                        No hay movimientos para este filtro
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  ) : (
+                    filteredMovements.map((mov) => {
+                      const category = categorizeMovement(mov);
+                      const style = categoryStyles[category];
+                      const Icon = style.icon;
+                      const isOutbound = mov.type === "outbound";
+                      const isMuestra = category === "muestra";
+                      const customerLabel = isMuestra
+                        ? mov.sample_customer?.name
+                          ? mov.sample_customer.name
+                          : "Cliente eliminado"
+                        : null;
+                      const customerClass =
+                        isMuestra && !mov.sample_customer
+                          ? "text-[#64748B] italic"
+                          : "text-[#1E293B]";
+                      return (
+                        <TableRow key={mov.id}>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`border ${style.className}`}
+                            >
+                              <Icon className="mr-1 h-3 w-3" />
+                              {style.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {isOutbound ? "-" : "+"}
+                            {mov.quantity}
+                          </TableCell>
+                          <TableCell className="max-w-[240px] text-[#64748B]">
+                            {customerLabel && (
+                              <span
+                                className={`block text-xs font-medium ${customerClass}`}
+                              >
+                                {customerLabel}
+                              </span>
+                            )}
+                            <span className="block truncate">
+                              {mov.notes || "—"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-[#64748B]">
+                            {formatDate(mov.created_at)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </DialogContent>

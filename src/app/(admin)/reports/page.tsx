@@ -1,6 +1,7 @@
 import { listAllCouriers } from "@/actions/couriers";
 import { listProducts } from "@/actions/inventory";
 import { SalesReport } from "@/components/admin/reports/sales-report";
+import { OutboundReport } from "@/components/admin/reports/outbound-report";
 
 export default async function ReportsPage() {
   const [couriersResult, productsResult] = await Promise.all([
@@ -12,7 +13,7 @@ export default async function ReportsPage() {
   const products = productsResult.data ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-[#1E293B]">Reportes</h2>
         <p className="text-sm text-[#64748B]">
@@ -20,6 +21,7 @@ export default async function ReportsPage() {
         </p>
       </div>
       <SalesReport couriers={couriers} products={products} />
+      <OutboundReport />
     </div>
   );
 }

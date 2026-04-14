@@ -27,9 +27,16 @@ interface CustomerFormProps {
   onClose: () => void;
   customer?: Customer | null;
   couriers?: User[];
+  commercials?: User[];
 }
 
-export function CustomerForm({ open, onClose, customer, couriers = [] }: CustomerFormProps) {
+export function CustomerForm({
+  open,
+  onClose,
+  customer,
+  couriers = [],
+  commercials = [],
+}: CustomerFormProps) {
   const isEditing = !!customer;
   const actionFn = isEditing
     ? updateCustomer.bind(null, customer.id)
@@ -132,6 +139,29 @@ export function CustomerForm({ open, onClose, customer, couriers = [] }: Custome
                 </SelectContent>
               </Select>
               <p className="text-xs text-[#64748B]">Solo informativo, no afecta la asignación de pedidos</p>
+            </div>
+          )}
+
+          {commercials.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="commercial_id">Comercial asignado</Label>
+              <Select
+                name="commercial_id"
+                defaultValue={customer?.commercial_id ?? ""}
+                disabled={isPending}
+              >
+                <SelectTrigger id="commercial_id">
+                  <SelectValue placeholder="Sin comercial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin comercial</SelectItem>
+                  {commercials.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

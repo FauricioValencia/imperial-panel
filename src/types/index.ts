@@ -4,8 +4,8 @@ import { z } from "zod";
 // Enums
 // ============================================
 
-export const USER_ROLE = ["admin", "courier", "super_admin"] as const;
-export const MANAGEABLE_ROLES = ["admin", "courier"] as const;
+export const USER_ROLE = ["admin", "courier", "super_admin", "commercial"] as const;
+export const MANAGEABLE_ROLES = ["admin", "courier", "commercial"] as const;
 export const ORDER_STATUS = [
   "pending",
   "assigned",
@@ -35,6 +35,7 @@ export const customerSchema = z.object({
   address: z.string().optional(),
   reference_code: z.string().min(1).optional(),
   preferred_courier_id: z.string().uuid().optional(),
+  commercial_id: z.string().uuid().optional(),
 });
 
 export const productSchema = z.object({
@@ -199,9 +200,13 @@ export interface Customer {
   active: boolean;
   reference_code: string | null;
   preferred_courier_id: string | null;
+  commercial_id: string | null;
   created_at: string;
   preferred_courier?: User;
+  commercial?: User;
 }
+
+export type Commercial = User & { role: "commercial" };
 
 export interface Product {
   id: string;

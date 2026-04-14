@@ -10,6 +10,7 @@ import {
   FileBarChart,
   Users,
   Bike,
+  Briefcase,
   LogOut,
   MapPin,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const navigation = [
   { label: "Inventario", href: "/inventory", icon: ClipboardList },
   { label: "Clientes", href: "/customers", icon: Users },
   { label: "Domiciliarios", href: "/couriers", icon: Bike },
+  { label: "Comerciales", href: "/commercials", icon: Briefcase },
   { label: "Zonas", href: "/zones", icon: MapPin },
   { label: "Reportes", href: "/reports", icon: FileBarChart },
 ];

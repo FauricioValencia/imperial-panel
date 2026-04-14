@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CustomerCombobox } from "./customer-combobox";
 import type { ActionResponse, Customer, Product } from "@/types";
 
 const initialState: ActionResponse = { success: false };
@@ -34,9 +35,21 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
   const [state, formAction, isPending] = useActionState(registerOutbound, initialState);
   const [reason, setReason] = useState<"merma" | "muestra">("merma");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [quantity, setQuantity] = useState<string>("");
   const prevSuccessRef = useRef(false);
 
-  const submitDisabled = isPending || (reason === "muestra" && !selectedCustomerId);
+  const parsedQuantity = Number.parseInt(quantity, 10);
+  const validQuantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0;
+  const remainingStock = validQuantity ? product.stock - parsedQuantity : product.stock;
+  const belowMinStock =
+    validQuantity && remainingStock > 0 && remainingStock < product.min_stock;
+  const willBeZeroOrNegative = validQuantity && remainingStock <= 0;
+
+  const submitDisabled =
+    isPending ||
+    !validQuantity ||
+    parsedQuantity > product.stock ||
+    (reason === "muestra" && !selectedCustomerId);
 
   useEffect(() => {
     if (state.success && !prevSuccessRef.current) {
@@ -50,6 +63,7 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
       prevSuccessRef.current = false;
       setReason("merma");
       setSelectedCustomerId("");
+      setQuantity("");
     }
   }, [open]);
 
@@ -80,7 +94,11 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
             <Select
               name="reason"
               value={reason}
-              onValueChange={(v) => setReason(v as "merma" | "muestra")}
+              onValueChange={(v) => {
+                const next = v as "merma" | "muestra";
+                setReason(next);
+                if (next === "merma") setSelectedCustomerId("");
+              }}
               disabled={isPending}
             >
               <SelectTrigger id="reason">
@@ -96,28 +114,14 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
           {reason === "muestra" && (
             <div className="space-y-2">
               <Label htmlFor="customer_id">Cliente *</Label>
-              <Select
-                name="customer_id"
+              <input type="hidden" name="customer_id" value={selectedCustomerId} />
+              <CustomerCombobox
+                id="customer_id"
+                customers={customers}
                 value={selectedCustomerId}
-                onValueChange={setSelectedCustomerId}
+                onChange={setSelectedCustomerId}
                 disabled={isPending}
-              >
-                <SelectTrigger id="customer_id">
-                  <SelectValue placeholder="Seleccionar cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                      {c.reference_code && (
-                        <span className="ml-2 text-xs text-[#64748B]">
-                          ({c.reference_code})
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
               {!selectedCustomerId && (
                 <p className="text-xs text-[#EF4444]">Requerido para salidas tipo muestra</p>
               )}
@@ -134,7 +138,32 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
               max={product.stock}
               required
               disabled={isPending}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="min-h-11"
             />
+            {validQuantity && parsedQuantity <= product.stock && (
+              <p
+                className={
+                  willBeZeroOrNegative
+                    ? "text-xs font-medium text-[#EF4444]"
+                    : belowMinStock
+                      ? "text-xs font-medium text-[#F59E0B]"
+                      : "text-xs text-[#64748B]"
+                }
+              >
+                {willBeZeroOrNegative
+                  ? "Stock quedará en cero"
+                  : belowMinStock
+                    ? `Quedará: ${remainingStock} unidades — por debajo del stock mínimo (${product.min_stock})`
+                    : `Quedará: ${remainingStock} unidades`}
+              </p>
+            )}
+            {validQuantity && parsedQuantity > product.stock && (
+              <p className="text-xs font-medium text-[#EF4444]">
+                Cantidad supera el stock disponible
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

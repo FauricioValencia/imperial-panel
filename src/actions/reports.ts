@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { verifyAdmin } from "@/lib/auth-helpers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -7,7 +8,41 @@ import {
   type ActionResponse,
   type SalesByMonthReport,
 } from "@/types";
-import { logError } from "@/lib/logger";
+import { logError, logOperacion } from "@/lib/logger";
+
+// Filtros para el reporte de salidas manuales (mermas / muestras)
+const outboundFiltersSchema = z.object({
+  from: z.string().min(1, "Fecha 'from' requerida"),
+  to: z.string().min(1, "Fecha 'to' requerida"),
+  reason: z.enum(["merma", "muestra"]).optional(),
+});
+
+export interface OutboundMovementRow {
+  id: string;
+  created_at: string;
+  product_id: string;
+  product_name: string;
+  product_price: number;
+  quantity: number;
+  reason: "merma" | "muestra";
+  customer_id: string | null;
+  customer_name: string | null;
+  notes: string | null;
+  // Valor estimado = quantity * precio ACTUAL del producto.
+  // Nota: no es costo histórico, es aproximación usando el precio vigente.
+  estimated_value: number;
+}
+
+export interface OutboundReportData {
+  mermas: OutboundMovementRow[];
+  muestras: OutboundMovementRow[];
+  totals: {
+    mermas_quantity: number;
+    mermas_value: number;
+    muestras_quantity: number;
+    muestras_value: number;
+  };
+}
 
 export async function getSalesByMonth(
   filters: unknown
@@ -208,6 +243,141 @@ export async function getMyCourierStats(filters: {
       orders: typedOrders,
       total_orders: totalOrders,
       total_amount: totalAmount,
+    },
+  };
+}
+
+// ============================================
+// Reporte de salidas manuales (mermas / muestras)
+// ============================================
+// Devuelve movimientos tipo 'outbound' con reason IN ('merma','muestra')
+// del admin actual, agrupados en dos secciones para la UI.
+//
+// Nota sobre estimated_value: se calcula como quantity * products.price
+// usando el PRECIO ACTUAL del producto. No es costo histórico ni valor
+// contable exacto; es una aproximación para dar una idea del impacto.
+export async function getOutboundMovements(
+  filters: unknown
+): Promise<ActionResponse<OutboundReportData>> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const result = outboundFiltersSchema.safeParse(filters);
+  if (!result.success) {
+    return { success: false, error: result.error.issues[0].message };
+  }
+
+  const { from, to, reason } = result.data;
+
+  // El input viene como "YYYY-MM-DD" (date input nativo). Tratamos el rango
+  // como inclusivo en zona horaria de Colombia (UTC-5, sin DST):
+  //   from → 00:00 hora Colombia → 05:00 UTC del mismo día
+  //   to   → 00:00 hora Colombia del día SIGUIENTE → usamos lt() exclusivo
+  // Así "hoy hasta hoy" incluye todo el día actual hasta las 23:59:59 locales.
+  const fromUtc = `${from}T05:00:00.000Z`;
+  const toDate = new Date(`${to}T00:00:00.000Z`);
+  toDate.setUTCDate(toDate.getUTCDate() + 1);
+  const toUtcExclusive = `${toDate.toISOString().slice(0, 10)}T05:00:00.000Z`;
+
+  let query = ctx.supabase
+    .from("inventory_movements")
+    .select(`
+      id,
+      created_at,
+      quantity,
+      reason,
+      notes,
+      product_id,
+      sample_customer_id,
+      product:products!product_id(id, name, price),
+      sample_customer:customers!sample_customer_id(id, name)
+    `)
+    .eq("admin_id", ctx.user.id)
+    .eq("type", "outbound")
+    .in("reason", ["merma", "muestra"])
+    .gte("created_at", fromUtc)
+    .lt("created_at", toUtcExclusive)
+    .order("created_at", { ascending: false });
+
+  if (reason) {
+    query = query.eq("reason", reason);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    logError("get_outbound_movements", error);
+    return { success: false, error: "Error al obtener salidas manuales" };
+  }
+
+  type ProductRow = { id: string; name: string; price: number } | null;
+  type CustomerRow = { id: string; name: string } | null;
+  type RawRow = {
+    id: string;
+    created_at: string;
+    quantity: number;
+    reason: "merma" | "muestra";
+    notes: string | null;
+    product_id: string;
+    sample_customer_id: string | null;
+    product: ProductRow;
+    sample_customer: CustomerRow;
+  };
+
+  const rows = (data ?? []) as unknown as RawRow[];
+
+  const mermas: OutboundMovementRow[] = [];
+  const muestras: OutboundMovementRow[] = [];
+  let mermasQty = 0;
+  let mermasValue = 0;
+  let muestrasQty = 0;
+  let muestrasValue = 0;
+
+  for (const row of rows) {
+    const price = row.product?.price ?? 0;
+    const estimated_value = row.quantity * price;
+    const mapped: OutboundMovementRow = {
+      id: row.id,
+      created_at: row.created_at,
+      product_id: row.product_id,
+      product_name: row.product?.name ?? "(producto eliminado)",
+      product_price: price,
+      quantity: row.quantity,
+      reason: row.reason,
+      customer_id: row.sample_customer_id,
+      customer_name: row.sample_customer?.name ?? null,
+      notes: row.notes,
+      estimated_value,
+    };
+
+    if (row.reason === "merma") {
+      mermas.push(mapped);
+      mermasQty += row.quantity;
+      mermasValue += estimated_value;
+    } else {
+      muestras.push(mapped);
+      muestrasQty += row.quantity;
+      muestrasValue += estimated_value;
+    }
+  }
+
+  logOperacion(
+    "outbound_report_queried",
+    { from, to, reason: reason ?? "all", count: rows.length },
+    ctx.user.id
+  );
+
+  return {
+    success: true,
+    data: {
+      mermas,
+      muestras,
+      totals: {
+        mermas_quantity: mermasQty,
+        mermas_value: mermasValue,
+        muestras_quantity: muestrasQty,
+        muestras_value: muestrasValue,
+      },
     },
   };
 }
