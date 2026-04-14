@@ -40,6 +40,7 @@ export function CourierForm({ open, onClose, courier, zones = [] }: CourierFormP
   const formRef = useRef<HTMLFormElement>(null);
   const prevSuccessRef = useRef(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [zoneValue, setZoneValue] = useState<string>(courier?.zone_id ?? "none");
 
   useEffect(() => {
     if (state.success && !prevSuccessRef.current) {
@@ -95,16 +96,21 @@ export function CourierForm({ open, onClose, courier, zones = [] }: CourierFormP
           {zones.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="zone_id">Zona</Label>
-              <Select
+              <input
+                type="hidden"
                 name="zone_id"
-                defaultValue={courier?.zone_id ?? ""}
+                value={zoneValue === "none" ? "" : zoneValue}
+              />
+              <Select
+                value={zoneValue}
+                onValueChange={setZoneValue}
                 disabled={isPending}
               >
                 <SelectTrigger id="zone_id">
                   <SelectValue placeholder="Sin zona asignada" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin zona</SelectItem>
+                  <SelectItem value="none">Sin zona</SelectItem>
                   {zones.map((z) => (
                     <SelectItem key={z.id} value={z.id}>
                       {z.name}

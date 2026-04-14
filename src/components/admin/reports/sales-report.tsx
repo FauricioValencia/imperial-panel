@@ -44,22 +44,30 @@ interface SalesReportProps {
   products: Product[];
 }
 
+const NOW = new Date();
+const CURRENT_YEAR = String(NOW.getFullYear());
+const CURRENT_MONTH = String(NOW.getMonth() + 1);
+
 export function SalesReport({ couriers, products }: SalesReportProps) {
   const [mounted, setMounted] = useState(false);
-  const [year, setYear] = useState("");
-  const [month, setMonth] = useState("");
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [month, setMonth] = useState(CURRENT_MONTH);
   const [courierId, setCourierId] = useState("all");
   const [productId, setProductId] = useState("all");
-
-  useEffect(() => {
-    const now = new Date();
-    setYear(String(now.getFullYear()));
-    setMonth(String(now.getMonth() + 1));
-    setMounted(true);
-  }, []);
   const [results, setResults] = useState<SalesByMonthReport[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const validCouriers = couriers.filter((c) => c.id);
+  const validProducts = products.filter((p) => p.id);
+
+  if (!mounted) {
+    return null;
+  }
 
   function handleSearch() {
     startTransition(async () => {
@@ -84,13 +92,9 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
   const totalItems = results.reduce((sum, r) => sum + r.total_items, 0);
   const totalOrders = results.reduce((sum, r) => sum + r.total_orders, 0);
 
-  const years = mounted
-    ? Array.from({ length: 3 }, (_, i) => String(Number(year) - i))
-    : [];
-
-  if (!mounted) {
-    return null;
-  }
+  const years = Array.from({ length: 3 }, (_, i) =>
+    String(Number(CURRENT_YEAR) - i),
+  );
 
   return (
     <div className="space-y-6">
@@ -141,7 +145,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {couriers.map((c) => (
+                  {validCouriers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -156,7 +160,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {products.map((p) => (
+                  {validProducts.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigo ? `[${p.codigo}] ` : ""}{p.name}
                     </SelectItem>
