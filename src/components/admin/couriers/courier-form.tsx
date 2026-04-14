@@ -93,7 +93,7 @@ export function CourierForm({ open, onClose, courier, zones = [] }: CourierFormP
             />
           </div>
 
-          {zones.length > 0 && (
+          {zones.filter((z) => z.id).length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="zone_id">Zona</Label>
               <input
@@ -102,7 +102,7 @@ export function CourierForm({ open, onClose, courier, zones = [] }: CourierFormP
                 value={zoneValue === "none" ? "" : zoneValue}
               />
               <Select
-                value={zoneValue}
+                value={zoneValue || "none"}
                 onValueChange={setZoneValue}
                 disabled={isPending}
               >
@@ -111,11 +111,13 @@ export function CourierForm({ open, onClose, courier, zones = [] }: CourierFormP
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin zona</SelectItem>
-                  {zones.map((z) => (
-                    <SelectItem key={z.id} value={z.id}>
-                      {z.name}
-                    </SelectItem>
-                  ))}
+                  {zones
+                    .filter((z) => z.id)
+                    .map((z) => (
+                      <SelectItem key={z.id} value={z.id}>
+                        {z.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

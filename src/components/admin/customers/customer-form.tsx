@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { createCustomer, updateCustomer } from "@/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,12 @@ export function CustomerForm({
   const [state, formAction, isPending] = useActionState(actionFn, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const prevSuccessRef = useRef(false);
+  const [courierValue, setCourierValue] = useState<string>(
+    customer?.preferred_courier_id ?? "none",
+  );
+  const [commercialValue, setCommercialValue] = useState<string>(
+    customer?.commercial_id ?? "none",
+  );
 
   useEffect(() => {
     if (state.success && !prevSuccessRef.current) {
@@ -121,16 +127,21 @@ export function CustomerForm({
           {couriers.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="preferred_courier_id">Domiciliario asignado</Label>
-              <Select
+              <input
+                type="hidden"
                 name="preferred_courier_id"
-                defaultValue={customer?.preferred_courier_id ?? ""}
+                value={courierValue === "none" ? "" : courierValue}
+              />
+              <Select
+                value={courierValue}
+                onValueChange={setCourierValue}
                 disabled={isPending}
               >
                 <SelectTrigger id="preferred_courier_id">
                   <SelectValue placeholder="Sin asignar" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin asignar</SelectItem>
+                  <SelectItem value="none">Sin asignar</SelectItem>
                   {couriers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -145,16 +156,21 @@ export function CustomerForm({
           {commercials.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="commercial_id">Comercial asignado</Label>
-              <Select
+              <input
+                type="hidden"
                 name="commercial_id"
-                defaultValue={customer?.commercial_id ?? ""}
+                value={commercialValue === "none" ? "" : commercialValue}
+              />
+              <Select
+                value={commercialValue}
+                onValueChange={setCommercialValue}
                 disabled={isPending}
               >
                 <SelectTrigger id="commercial_id">
                   <SelectValue placeholder="Sin comercial" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin comercial</SelectItem>
+                  <SelectItem value="none">Sin comercial</SelectItem>
                   {commercials.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
