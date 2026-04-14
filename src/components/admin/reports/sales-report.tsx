@@ -50,8 +50,8 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
 
   const [year, setYear] = useState(String(currentYear));
   const [month, setMonth] = useState(String(currentMonth));
-  const [courierId, setCourierId] = useState("");
-  const [productId, setProductId] = useState("");
+  const [courierId, setCourierId] = useState("all");
+  const [productId, setProductId] = useState("all");
   const [results, setResults] = useState<SalesByMonthReport[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -60,9 +60,9 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
     startTransition(async () => {
       const filters = {
         year: Number(year),
-        month: month ? Number(month) : undefined,
-        courier_id: courierId || undefined,
-        product_id: productId || undefined,
+        month: month && month !== "all" ? Number(month) : undefined,
+        courier_id: courierId !== "all" ? courierId : undefined,
+        product_id: productId !== "all" ? productId : undefined,
       };
 
       const result = await getSalesByMonth(filters);
@@ -114,7 +114,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                   <SelectValue placeholder="Todos los meses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los meses</SelectItem>
+                  <SelectItem value="all">Todos los meses</SelectItem>
                   {MONTHS.map((m) => (
                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                   ))}
@@ -129,7 +129,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {couriers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
@@ -144,7 +144,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {products.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigo ? `[${p.codigo}] ` : ""}{p.name}
@@ -207,7 +207,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                     <TableRow>
                       <TableHead>Domiciliario</TableHead>
                       <TableHead>Mes</TableHead>
-                      {productId && <TableHead>Producto</TableHead>}
+                      {productId !== "all" &&<TableHead>Producto</TableHead>}
                       <TableHead className="text-center">Pedidos</TableHead>
                       <TableHead className="text-center">Unidades</TableHead>
                       <TableHead className="text-right">Total</TableHead>
@@ -222,7 +222,7 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                         <TableCell className="text-[#64748B]">
                           {MONTHS.find((m) => m.value === String(row.month))?.label} {row.year}
                         </TableCell>
-                        {productId && (
+                        {productId !== "all" &&(
                           <TableCell className="text-[#64748B]">
                             {row.product_codigo && (
                               <span className="mr-1 font-mono text-xs">[{row.product_codigo}]</span>
