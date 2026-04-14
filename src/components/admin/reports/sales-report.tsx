@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -45,13 +45,18 @@ interface SalesReportProps {
 }
 
 export function SalesReport({ couriers, products }: SalesReportProps) {
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
-
-  const [year, setYear] = useState(String(currentYear));
-  const [month, setMonth] = useState(String(currentMonth));
+  const [mounted, setMounted] = useState(false);
+  const [year, setYear] = useState("");
+  const [month, setMonth] = useState("");
   const [courierId, setCourierId] = useState("all");
   const [productId, setProductId] = useState("all");
+
+  useEffect(() => {
+    const now = new Date();
+    setYear(String(now.getFullYear()));
+    setMonth(String(now.getMonth() + 1));
+    setMounted(true);
+  }, []);
   const [results, setResults] = useState<SalesByMonthReport[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -79,7 +84,13 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
   const totalItems = results.reduce((sum, r) => sum + r.total_items, 0);
   const totalOrders = results.reduce((sum, r) => sum + r.total_orders, 0);
 
-  const years = Array.from({ length: 3 }, (_, i) => String(currentYear - i));
+  const years = mounted
+    ? Array.from({ length: 3 }, (_, i) => String(Number(year) - i))
+    : [];
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DollarSign, Download, Share2 } from "lucide-react";
+import { DollarSign, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,17 +61,6 @@ export function CustomerBillingDetail({
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
   const pdfUrl = `/api/pdf/ticket/${customer.id}`;
 
-  function handleShareWhatsApp() {
-    const phone = customer.phone?.replace(/\D/g, "") || "";
-    const message = encodeURIComponent(
-      `Hola ${customer.name}, le compartimos su estado de cuenta. Saldo pendiente: ${formatCurrency(totalBilled - totalPaid)}. Puede ver el detalle aqui: ${window.location.origin}${pdfUrl}`
-    );
-    const url = phone
-      ? `https://wa.me/57${phone}?text=${message}`
-      : `https://wa.me/?text=${message}`;
-    window.open(url, "_blank");
-  }
-
   // Calculate paid amount per order
   function getOrderPaid(orderId: string): number {
     return payments
@@ -88,10 +77,6 @@ export function CustomerBillingDetail({
             Descargar PDF
           </Button>
         </a>
-        <Button variant="outline" size="sm" onClick={handleShareWhatsApp}>
-          <Share2 className="mr-2 h-4 w-4" />
-          Enviar por WhatsApp
-        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">

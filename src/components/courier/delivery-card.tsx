@@ -30,12 +30,19 @@ export function DeliveryCard({ order, onDeliveryConfirmed }: DeliveryCardProps) 
 
   function handleMarkInTransit() {
     setError("");
+    console.log("[delivery-card] handleMarkInTransit click", order.id);
     startTransition(async () => {
-      const result = await markInTransit(order.id);
-      if (result.success) {
-        router.refresh();
-      } else {
-        setError(result.error || "Error al actualizar");
+      try {
+        const result = await markInTransit(order.id);
+        console.log("[delivery-card] markInTransit result", result);
+        if (result.success) {
+          router.refresh();
+        } else {
+          setError(result.error || "Error al actualizar");
+        }
+      } catch (err) {
+        console.error("[delivery-card] markInTransit threw", err);
+        setError(err instanceof Error ? err.message : "Error inesperado");
       }
     });
   }
