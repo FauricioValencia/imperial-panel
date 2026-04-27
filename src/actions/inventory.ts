@@ -5,18 +5,13 @@ import { verifyAdmin } from "@/lib/auth-helpers";
 import {
   productSchema,
   registerOutboundSchema,
+  stockEntryWithLotSchema,
   type ActionResponse,
   type Product,
+  type ProductLot,
   type InventoryMovement,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
-import { z } from "zod";
-
-const stockEntrySchema = z.object({
-  product_id: z.string().uuid(),
-  quantity: z.number().int().positive("Quantity must be positive"),
-  notes: z.string().optional(),
-});
 
 export async function listProducts(search?: string): Promise<ActionResponse<Product[]>> {
   const ctx = await verifyAdmin();
@@ -49,13 +44,26 @@ export async function createProduct(
   const ctx = await verifyAdmin();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
+  const stockValue = Number(formData.get("stock"));
+  const noExpiration = formData.get("initial_no_expiration") === "on";
+  const expiresAtRaw = formData.get("initial_expires_at") as string | null;
+  const supplierRaw = formData.get("initial_supplier") as string | null;
+  const initialUnitCostRaw = formData.get("initial_unit_cost");
+
   const raw = {
     name: formData.get("name"),
     codigo: (formData.get("codigo") as string) || undefined,
     description: formData.get("description") || undefined,
     price: Number(formData.get("price")),
-    stock: Number(formData.get("stock")),
+    stock: stockValue,
     min_stock: Number(formData.get("min_stock")) || 5,
+    initial_unit_cost:
+      initialUnitCostRaw !== null && initialUnitCostRaw !== ""
+        ? Number(initialUnitCostRaw)
+        : undefined,
+    initial_expires_at: expiresAtRaw || undefined,
+    initial_no_expiration: noExpiration,
+    initial_supplier: supplierRaw || undefined,
   };
 
   const result = productSchema.safeParse(raw);
@@ -63,14 +71,30 @@ export async function createProduct(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  // Normalizar código a mayúsculas para consistencia
+  if (result.data.stock > 0 && result.data.initial_unit_cost === undefined) {
+    return {
+      success: false,
+      error: "Indica el costo unitario del lote inicial cuando hay stock inicial",
+    };
+  }
+  if (result.data.stock > 0 && !result.data.initial_no_expiration && !result.data.initial_expires_at) {
+    return {
+      success: false,
+      error: "Indica fecha de vencimiento o marca producto no perecedero",
+    };
+  }
+
   const dataToInsert = {
-    ...result.data,
+    name: result.data.name,
     codigo: result.data.codigo?.toUpperCase() ?? null,
+    description: result.data.description ?? null,
+    price: result.data.price,
+    stock: 0,
+    min_stock: result.data.min_stock,
     admin_id: ctx.user.id,
   };
 
-  const { data, error } = await ctx.supabase
+  const { data: product, error } = await ctx.supabase
     .from("products")
     .insert(dataToInsert)
     .select()
@@ -85,21 +109,38 @@ export async function createProduct(
   }
 
   if (result.data.stock > 0) {
-    const { error: movError } = await ctx.supabase.from("inventory_movements").insert({
-      product_id: data.id,
-      type: "inbound",
-      quantity: result.data.stock,
-      notes: "Initial stock on product creation",
-      admin_id: ctx.user.id,
+    const { data: lotId, error: lotError } = await ctx.supabase.rpc("inbound_stock_with_lot", {
+      p_product_id: product.id,
+      p_quantity: result.data.stock,
+      p_unit_cost: result.data.initial_unit_cost!,
+      p_admin_id: ctx.user.id,
+      p_expires_at: result.data.initial_no_expiration
+        ? null
+        : result.data.initial_expires_at ?? null,
+      p_no_expiration: result.data.initial_no_expiration ?? false,
+      p_supplier: result.data.initial_supplier ?? null,
+      p_notes: "Lote inicial al crear producto",
     });
-    if (movError) {
-      logError("create_product_initial_movement", movError, { product_id: data.id });
+
+    if (lotError) {
+      logError("create_product_initial_lot", lotError, { product_id: product.id });
+      return {
+        success: false,
+        error: `Producto creado pero falló el lote inicial: ${lotError.message}`,
+      };
     }
+
+    logOperacion(
+      "product_created_with_lot",
+      { product_id: product.id, name: product.name, lot_id: lotId, quantity: result.data.stock },
+      ctx.user.id
+    );
+  } else {
+    logOperacion("product_created", { product_id: product.id, name: product.name }, ctx.user.id);
   }
 
-  logOperacion("product_created", { product_id: data.id, name: data.name }, ctx.user.id);
   revalidatePath("/inventory");
-  return { success: true, data };
+  return { success: true, data: product };
 }
 
 export async function updateProduct(
@@ -124,11 +165,13 @@ export async function updateProduct(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  // Don't update stock directly, only basic data
-  const { stock: _stock, ...rest } = result.data;
+  // Solo datos basicos: stock se mueve por lotes (RPCs)
   const dataToUpdate = {
-    ...rest,
-    codigo: rest.codigo?.toUpperCase() ?? null,
+    name: result.data.name,
+    codigo: result.data.codigo?.toUpperCase() ?? null,
+    description: result.data.description ?? null,
+    price: result.data.price,
+    min_stock: result.data.min_stock,
   };
 
   const { error } = await ctx.supabase
@@ -175,54 +218,66 @@ export async function registerStockEntry(
   const ctx = await verifyAdmin();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
+  const noExpiration = formData.get("no_expiration") === "on";
+  const expiresAtRaw = formData.get("expires_at") as string | null;
+
   const raw = {
     product_id: formData.get("product_id") as string,
     quantity: Number(formData.get("quantity")),
+    unit_cost: Number(formData.get("unit_cost")),
+    lot_number: (formData.get("lot_number") as string) || undefined,
+    expires_at: expiresAtRaw || undefined,
+    no_expiration: noExpiration,
+    supplier: (formData.get("supplier") as string) || undefined,
     notes: (formData.get("notes") as string) || undefined,
   };
 
-  const result = stockEntrySchema.safeParse(raw);
+  const result = stockEntryWithLotSchema.safeParse(raw);
   if (!result.success) {
     return { success: false, error: result.error.issues[0].message };
   }
 
-  // Get product info for logging
   const { data: product } = await ctx.supabase
     .from("products")
-    .select("stock, name")
+    .select("id, name, stock, admin_id")
     .eq("id", result.data.product_id)
+    .eq("admin_id", ctx.user.id)
     .single();
 
   if (!product) {
-    return { success: false, error: "Product not found" };
+    return { success: false, error: "Producto no encontrado" };
   }
 
-  const previousStock = product.stock;
-
-  // Atomic stock increment + movement insert via RPC
-  const { error: stockError } = await ctx.supabase.rpc("inbound_stock", {
+  const { data: lotId, error: rpcError } = await ctx.supabase.rpc("inbound_stock_with_lot", {
     p_product_id: result.data.product_id,
     p_quantity: result.data.quantity,
-    p_notes: result.data.notes || "Manual stock entry",
+    p_unit_cost: result.data.unit_cost,
+    p_admin_id: ctx.user.id,
+    p_lot_number: result.data.lot_number ?? null,
+    p_expires_at: result.data.no_expiration ? null : result.data.expires_at ?? null,
+    p_no_expiration: result.data.no_expiration ?? false,
+    p_supplier: result.data.supplier ?? null,
+    p_notes: result.data.notes ?? null,
   });
 
-  if (stockError) {
-    logError("register_stock_entry", stockError);
-    return { success: false, error: "Error updating stock" };
+  if (rpcError) {
+    logError("register_stock_entry", rpcError);
+    return { success: false, error: `Error al crear lote: ${rpcError.message}` };
   }
 
   logOperacion(
-    "stock_entry",
+    "stock_entry_with_lot",
     {
       product_id: result.data.product_id,
       product_name: product.name,
+      lot_id: lotId,
       quantity: result.data.quantity,
-      previous_stock: previousStock,
-      new_stock: previousStock + result.data.quantity,
+      unit_cost: result.data.unit_cost,
     },
     ctx.user.id
   );
 
+  void lotId;
   revalidatePath("/inventory");
   return { success: true };
 }
@@ -235,7 +290,7 @@ export async function listMovements(
 
   const { data, error } = await ctx.supabase
     .from("inventory_movements")
-    .select("*, sample_customer:customers(id, name)")
+    .select("*, sample_customer:customers(id, name), lot:product_lots(id, lot_number)")
     .eq("product_id", productId)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -246,6 +301,55 @@ export async function listMovements(
   }
 
   return { success: true, data: data as InventoryMovement[] };
+}
+
+export async function listLots(productId?: string): Promise<ActionResponse<ProductLot[]>> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  let query = ctx.supabase
+    .from("product_lots")
+    .select("*, product:products(id, name, codigo, price)")
+    .eq("admin_id", ctx.user.id)
+    .order("received_at", { ascending: true });
+
+  if (productId) {
+    query = query.eq("product_id", productId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    logError("list_lots", error);
+    return { success: false, error: "Error fetching lots" };
+  }
+
+  return { success: true, data: data as ProductLot[] };
+}
+
+export async function listExpiringLots(daysAhead = 30): Promise<ActionResponse<ProductLot[]>> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + daysAhead);
+
+  const { data, error } = await ctx.supabase
+    .from("product_lots")
+    .select("*, product:products(id, name, codigo)")
+    .eq("admin_id", ctx.user.id)
+    .eq("active", true)
+    .gt("quantity_remaining", 0)
+    .not("expires_at", "is", null)
+    .lte("expires_at", cutoff.toISOString())
+    .order("expires_at", { ascending: true });
+
+  if (error) {
+    logError("list_expiring_lots", error);
+    return { success: false, error: "Error fetching expiring lots" };
+  }
+
+  return { success: true, data: data as ProductLot[] };
 }
 
 export async function registerOutbound(
@@ -268,10 +372,9 @@ export async function registerOutbound(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  // Verificar que el producto pertenece al admin (seguridad extra)
   const { data: product } = await ctx.supabase
     .from("products")
-    .select("id, name, stock")
+    .select("id, name, stock, stock_available")
     .eq("id", result.data.product_id)
     .eq("admin_id", ctx.user.id)
     .single();

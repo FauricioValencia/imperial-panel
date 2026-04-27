@@ -293,9 +293,19 @@ export async function confirmDelivery(
     }
   }
 
-  // Deduct stock only for delivered quantities (total - returned)
+  // Determine the admin_id this courier belongs to (required by deduct_stock)
+  const courierAdminId = ctx.user.admin_id;
+  if (!courierAdminId) {
+    logError("confirm_delivery_no_admin", new Error("Courier missing admin_id"), { order_id: orderId });
+    return { success: false, error: "El courier no esta vinculado a un admin" };
+  }
+
+  // Deduct stock only for delivered quantities (total - returned).
+  // The new deduct_stock signature uses FIFO multi-lot and records
+  // outbound_lot_allocations per order_item; rollback uses
+  // return_stock_by_item which reverts to the exact origin lot.
   let allReturned = true;
-  const deductedItems: { product_id: string; quantity: number }[] = [];
+  const deductedItems: { order_item_id: string; quantity: number }[] = [];
 
   for (const item of items) {
     const returnedQty = returnMap.get(item.id) ?? 0;
@@ -304,27 +314,32 @@ export async function confirmDelivery(
     if (deliveredQty > 0) {
       allReturned = false;
 
-      const { data: stockResult, error: stockError } = await ctx.supabase
-        .rpc("deduct_stock", {
-          p_product_id: item.product_id,
-          p_quantity: deliveredQty,
-          p_order_reference: orderId,
-        });
+      const { error: stockError } = await ctx.supabase.rpc("deduct_stock", {
+        p_product_id: item.product_id,
+        p_quantity: deliveredQty,
+        p_admin_id: courierAdminId,
+        p_order_item_id: item.id,
+        p_order_reference: orderId,
+        p_notes: null,
+      });
 
-      if (stockError || stockResult === false) {
-        // Rollback previously deducted items
+      if (stockError) {
+        // Rollback previously deducted items via allocations (LIFO)
         for (const deducted of deductedItems) {
-          await ctx.supabase.rpc("return_stock", {
-            p_product_id: deducted.product_id,
+          await ctx.supabase.rpc("return_stock_by_item", {
+            p_order_item_id: deducted.order_item_id,
             p_quantity: deducted.quantity,
-            p_order_reference: orderId,
+            p_admin_id: courierAdminId,
           });
         }
         logError("confirm_delivery_stock", stockError, { order_id: orderId });
-        return { success: false, error: "Error al descontar stock" };
+        return {
+          success: false,
+          error: stockError.message ?? "Error al descontar stock",
+        };
       }
 
-      deductedItems.push({ product_id: item.product_id, quantity: deliveredQty });
+      deductedItems.push({ order_item_id: item.id, quantity: deliveredQty });
     }
 
     // Update order item if it has returns

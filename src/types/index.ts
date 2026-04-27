@@ -45,7 +45,28 @@ export const productSchema = z.object({
   price: z.number().positive("Price must be positive"),
   stock: z.number().int().min(0, "Stock cannot be negative"),
   min_stock: z.number().int().min(0).default(5),
+  // Optional initial lot data when creating a product with stock > 0
+  initial_unit_cost: z.number().min(0).optional(),
+  initial_expires_at: z.string().optional(),
+  initial_no_expiration: z.boolean().optional(),
+  initial_supplier: z.string().optional(),
 });
+
+export const stockEntryWithLotSchema = z
+  .object({
+    product_id: z.string().uuid(),
+    quantity: z.number().int().positive("La cantidad debe ser mayor a cero"),
+    unit_cost: z.number().min(0, "El costo no puede ser negativo"),
+    lot_number: z.string().optional(),
+    expires_at: z.string().optional(),
+    no_expiration: z.boolean().optional(),
+    supplier: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .refine((d) => d.no_expiration || !!d.expires_at, {
+    message: "Indica fecha de vencimiento o marca producto no perecedero",
+    path: ["expires_at"],
+  });
 
 export const orderItemSchema = z.object({
   product_id: z.string().uuid(),
@@ -154,6 +175,7 @@ export const businessConfigSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type ProductInput = z.infer<typeof productSchema>;
+export type StockEntryWithLotInput = z.infer<typeof stockEntryWithLotSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
@@ -215,9 +237,38 @@ export interface Product {
   description: string | null;
   price: number;
   stock: number;
+  stock_available: number;
   min_stock: number;
   admin_id: string;
   active: boolean;
+  created_at: string;
+}
+
+export interface ProductLot {
+  id: string;
+  product_id: string;
+  admin_id: string;
+  lot_number: string;
+  unit_cost: number;
+  is_estimated_cost: boolean;
+  quantity_received: number;
+  quantity_remaining: number;
+  received_at: string;
+  expires_at: string | null;
+  supplier: string | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+  product?: Product;
+}
+
+export interface OutboundLotAllocation {
+  id: string;
+  order_item_id: string;
+  lot_id: string;
+  quantity: number;
+  unit_cost_snapshot: number;
+  admin_id: string;
   created_at: string;
 }
 
@@ -269,12 +320,16 @@ export interface InventoryMovement {
   type: MovementType;
   quantity: number;
   order_reference: string | null;
+  order_item_id: string | null;
+  lot_id: string | null;
+  unit_cost_snapshot: number | null;
   reason: string | null;
   sample_customer_id: string | null;
   notes: string | null;
   admin_id: string;
   created_at: string;
   sample_customer?: Customer;
+  lot?: ProductLot;
 }
 
 export interface CashClosing {

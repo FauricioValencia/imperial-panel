@@ -162,6 +162,7 @@ export function CouriersTable({ initialCouriers, zones = [] }: CouriersTableProp
       </div>
 
       <CourierForm
+        key={editingCourier?.id ?? "new"}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         courier={editingCourier}

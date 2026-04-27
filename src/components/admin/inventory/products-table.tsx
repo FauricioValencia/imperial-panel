@@ -332,6 +332,7 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
       </div>
 
       <ProductForm
+        key={editingProduct?.id ?? "new"}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         product={editingProduct}
