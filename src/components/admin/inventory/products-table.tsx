@@ -49,6 +49,27 @@ interface ProductsTableProps {
   customers?: Customer[];
 }
 
+function StockBadge({ product }: { product: Product }) {
+  const lowStock = product.stock <= product.min_stock;
+  const outOfStock = product.stock === 0;
+
+  if (outOfStock) {
+    return (
+      <Badge variant="destructive" className="bg-[#EF4444]">
+        Agotado
+      </Badge>
+    );
+  }
+  if (lowStock) {
+    return (
+      <Badge className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]">
+        {product.stock} (min: {product.min_stock})
+      </Badge>
+    );
+  }
+  return <span className="font-medium text-[#10B981]">{product.stock}</span>;
+}
+
 export function ProductsTable({ initialProducts, customers = [] }: ProductsTableProps) {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -96,15 +117,15 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
     <>
       {lowStockCount > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
+          <AlertTriangle className="h-4 w-4 shrink-0 text-[#F59E0B]" />
           <p className="text-sm text-amber-800">
             <strong>{lowStockCount}</strong> producto{lowStockCount > 1 ? "s" : ""} con stock bajo o agotado
           </p>
         </div>
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <Input
             placeholder="Buscar por nombre o descripcion..."
@@ -119,13 +140,94 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
         </Button>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
+      {/* Mobile cards (<md) */}
+      <div className="space-y-3 md:hidden">
+        {filtered.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-[#64748B]">
+            {search ? "No se encontraron productos" : "No hay productos registrados"}
+          </div>
+        ) : (
+          filtered.map((product) => (
+            <div
+              key={product.id}
+              className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-[#1E293B]">
+                    {product.name}
+                  </p>
+                  {product.codigo && (
+                    <p className="font-mono text-xs text-[#64748B]">
+                      {product.codigo}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <StockBadge product={product} />
+                </div>
+              </div>
+
+              {product.description && (
+                <p className="mt-2 line-clamp-2 text-xs text-[#64748B]">
+                  {product.description}
+                </p>
+              )}
+
+              <p className="mt-2 text-sm font-medium text-[#1E293B]">
+                {formatCurrency(product.price)}
+              </p>
+
+              <div className="mt-3 flex flex-wrap justify-end gap-1 border-t border-slate-100 pt-2">
+                <button
+                  onClick={() => setEntryProduct(product)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#10B981] hover:bg-emerald-50"
+                >
+                  <PackagePlus className="h-3.5 w-3.5" />
+                  Entrada
+                </button>
+                <button
+                  onClick={() => setOutboundProduct(product)}
+                  disabled={product.stock === 0}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#F59E0B] hover:bg-amber-50 disabled:opacity-40"
+                >
+                  <PackageMinus className="h-3.5 w-3.5" />
+                  Salida
+                </button>
+                <button
+                  onClick={() => setHistory({ id: product.id, name: product.name })}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#3B82F6] hover:bg-blue-50"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  Historial
+                </button>
+                <button
+                  onClick={() => handleEdit(product)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#3B82F6] hover:bg-blue-50"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editar
+                </button>
+                <button
+                  onClick={() => setDeletingProduct(product)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#EF4444] hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table (md+) */}
+      <div className="hidden rounded-lg border border-slate-200 bg-white md:block">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Código</TableHead>
+              <TableHead className="hidden lg:table-cell">Código</TableHead>
               <TableHead>Nombre</TableHead>
-              <TableHead>Descripcion</TableHead>
+              <TableHead className="hidden xl:table-cell">Descripcion</TableHead>
               <TableHead className="text-right">Precio</TableHead>
               <TableHead className="text-center">Stock</TableHead>
               <TableHead className="w-[160px]">Acciones</TableHead>
@@ -139,106 +241,91 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((product) => {
-                const lowStock = product.stock <= product.min_stock;
-                const outOfStock = product.stock === 0;
+              filtered.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell className="hidden font-mono text-xs text-[#64748B] lg:table-cell">
+                    {product.codigo || "—"}
+                  </TableCell>
+                  <TableCell className="font-medium text-[#1E293B]">
+                    {product.name}
+                  </TableCell>
+                  <TableCell className="hidden max-w-[200px] truncate text-[#64748B] xl:table-cell">
+                    {product.description || "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-[#1E293B]">
+                    {formatCurrency(product.price)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <StockBadge product={product} />
+                  </TableCell>
+                  <TableCell>
+                    <TooltipProvider delayDuration={300}>
+                      <div className="flex gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => setEntryProduct(product)}
+                              className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#10B981]"
+                            >
+                              <PackagePlus className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Registrar entrada</TooltipContent>
+                        </Tooltip>
 
-                return (
-                  <TableRow key={product.id}>
-                    <TableCell className="text-[#64748B] font-mono text-xs">
-                      {product.codigo || "—"}
-                    </TableCell>
-                    <TableCell className="font-medium text-[#1E293B]">
-                      {product.name}
-                    </TableCell>
-                    <TableCell className="text-[#64748B] max-w-[200px] truncate">
-                      {product.description || "—"}
-                    </TableCell>
-                    <TableCell className="text-right text-[#1E293B]">
-                      {formatCurrency(product.price)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {outOfStock ? (
-                        <Badge variant="destructive" className="bg-[#EF4444]">
-                          Agotado
-                        </Badge>
-                      ) : lowStock ? (
-                        <Badge className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]">
-                          {product.stock} (min: {product.min_stock})
-                        </Badge>
-                      ) : (
-                        <span className="text-[#10B981] font-medium">{product.stock}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <TooltipProvider delayDuration={300}>
-                        <div className="flex gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => setEntryProduct(product)}
-                                className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#10B981]"
-                              >
-                                <PackagePlus className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Registrar entrada</TooltipContent>
-                          </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => setOutboundProduct(product)}
+                              className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#F59E0B]"
+                              disabled={product.stock === 0}
+                            >
+                              <PackageMinus className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Registrar salida (merma/muestra)</TooltipContent>
+                        </Tooltip>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => setOutboundProduct(product)}
-                                className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#F59E0B]"
-                                disabled={product.stock === 0}
-                              >
-                                <PackageMinus className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Registrar salida (merma/muestra)</TooltipContent>
-                          </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => setHistory({ id: product.id, name: product.name })}
+                              className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
+                            >
+                              <History className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver movimientos</TooltipContent>
+                        </Tooltip>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => setHistory({ id: product.id, name: product.name })}
-                                className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
-                              >
-                                <History className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Ver movimientos</TooltipContent>
-                          </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => handleEdit(product)}
+                              className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar</TooltipContent>
+                        </Tooltip>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => handleEdit(product)}
-                                className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => setDeletingProduct(product)}
-                                className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#EF4444]"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Desactivar</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TooltipProvider>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => setDeletingProduct(product)}
+                              className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#EF4444]"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Desactivar</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

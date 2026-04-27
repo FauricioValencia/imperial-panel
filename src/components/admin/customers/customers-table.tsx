@@ -52,6 +52,22 @@ export function CustomersTable({
     );
   });
 
+  function getCourierName(c: Customer) {
+    return (
+      c.preferred_courier?.name ||
+      couriers.find((u) => u.id === c.preferred_courier_id)?.name ||
+      "—"
+    );
+  }
+
+  function getCommercialName(c: Customer) {
+    return (
+      c.commercial?.name ||
+      commercials.find((u) => u.id === c.commercial_id)?.name ||
+      "—"
+    );
+  }
+
   function handleEdit(customer: Customer) {
     setEditingCustomer(customer);
     setFormOpen(true);
@@ -75,8 +91,8 @@ export function CustomersTable({
 
   return (
     <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <Input
             placeholder="Buscar por nombre, telefono o direccion..."
@@ -91,15 +107,88 @@ export function CustomersTable({
         </Button>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
+      {/* Mobile cards (<md) */}
+      <div className="space-y-3 md:hidden">
+        {filtered.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-[#64748B]">
+            {search ? "No se encontraron clientes" : "No hay clientes registrados"}
+          </div>
+        ) : (
+          filtered.map((customer) => (
+            <div
+              key={customer.id}
+              className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-[#1E293B]">
+                    {customer.name}
+                  </p>
+                  {customer.reference_code && (
+                    <p className="font-mono text-xs text-[#64748B]">
+                      {customer.reference_code}
+                    </p>
+                  )}
+                </div>
+                {customer.pending_balance > 0 ? (
+                  <Badge variant="destructive" className="bg-[#EF4444] shrink-0">
+                    {formatCurrency(customer.pending_balance)}
+                  </Badge>
+                ) : (
+                  <span className="shrink-0 text-sm font-medium text-[#10B981]">
+                    Al dia
+                  </span>
+                )}
+              </div>
+
+              <dl className="mt-2 space-y-1 text-xs text-[#64748B]">
+                {customer.phone && (
+                  <div className="flex gap-2">
+                    <dt className="shrink-0">Telefono:</dt>
+                    <dd className="text-[#1E293B]">{customer.phone}</dd>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <dt className="shrink-0">Domiciliario:</dt>
+                  <dd className="truncate text-[#1E293B]">{getCourierName(customer)}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0">Comercial:</dt>
+                  <dd className="truncate text-[#1E293B]">{getCommercialName(customer)}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2">
+                <button
+                  onClick={() => handleEdit(customer)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#3B82F6] hover:bg-blue-50"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editar
+                </button>
+                <button
+                  onClick={() => setDeletingCustomer(customer)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#EF4444] hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Desactivar
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table (md+) */}
+      <div className="hidden rounded-lg border border-slate-200 bg-white md:block">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Código</TableHead>
+              <TableHead className="hidden lg:table-cell">Código</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Telefono</TableHead>
-              <TableHead>Domiciliario</TableHead>
-              <TableHead>Comercial</TableHead>
+              <TableHead className="hidden lg:table-cell">Domiciliario</TableHead>
+              <TableHead className="hidden xl:table-cell">Comercial</TableHead>
               <TableHead className="text-right">Saldo Pendiente</TableHead>
               <TableHead className="w-[100px]">Acciones</TableHead>
             </TableRow>
@@ -114,7 +203,7 @@ export function CustomersTable({
             ) : (
               filtered.map((customer) => (
                 <TableRow key={customer.id}>
-                  <TableCell className="text-[#64748B] font-mono text-xs">
+                  <TableCell className="hidden font-mono text-xs text-[#64748B] lg:table-cell">
                     {customer.reference_code || "—"}
                   </TableCell>
                   <TableCell className="font-medium text-[#1E293B]">
@@ -123,15 +212,11 @@ export function CustomersTable({
                   <TableCell className="text-[#64748B]">
                     {customer.phone || "—"}
                   </TableCell>
-                  <TableCell className="text-[#64748B] text-sm">
-                    {customer.preferred_courier
-                      ? customer.preferred_courier.name
-                      : couriers.find((c) => c.id === customer.preferred_courier_id)?.name || "—"}
+                  <TableCell className="hidden text-sm text-[#64748B] lg:table-cell">
+                    {getCourierName(customer)}
                   </TableCell>
-                  <TableCell className="text-[#64748B] text-sm">
-                    {customer.commercial
-                      ? customer.commercial.name
-                      : commercials.find((c) => c.id === customer.commercial_id)?.name || "—"}
+                  <TableCell className="hidden text-sm text-[#64748B] xl:table-cell">
+                    {getCommercialName(customer)}
                   </TableCell>
                   <TableCell className="text-right">
                     {customer.pending_balance > 0 ? (
@@ -139,7 +224,7 @@ export function CustomersTable({
                         {formatCurrency(customer.pending_balance)}
                       </Badge>
                     ) : (
-                      <span className="text-[#10B981] font-medium">
+                      <span className="font-medium text-[#10B981]">
                         {formatCurrency(0)}
                       </span>
                     )}

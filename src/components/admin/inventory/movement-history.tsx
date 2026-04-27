@@ -137,7 +137,7 @@ export function MovementHistory({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">
             Movimientos - {productName}
@@ -154,7 +154,7 @@ export function MovementHistory({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
               <Label htmlFor="movement-filter" className="text-xs text-[#64748B]">
                 Filtrar por tipo
               </Label>
@@ -164,7 +164,7 @@ export function MovementHistory({
               >
                 <SelectTrigger
                   id="movement-filter"
-                  className="h-8 w-[180px] text-sm"
+                  className="h-8 w-full text-sm sm:w-[180px]"
                   aria-label="Filtrar movimientos por tipo"
                 >
                   <SelectValue />
@@ -186,9 +186,9 @@ export function MovementHistory({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tipo</TableHead>
-                    <TableHead className="text-right">Cantidad</TableHead>
-                    <TableHead>Detalle / Notas</TableHead>
-                    <TableHead>Fecha</TableHead>
+                    <TableHead className="text-right">Cant.</TableHead>
+                    <TableHead className="hidden sm:table-cell">Detalle / Notas</TableHead>
+                    <TableHead className="hidden md:table-cell">Fecha</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -227,12 +227,23 @@ export function MovementHistory({
                               <Icon className="mr-1 h-3 w-3" />
                               {style.label}
                             </Badge>
+                            <p className="mt-1 text-xs text-[#64748B] sm:hidden">
+                              {customerLabel && (
+                                <span className={`block font-medium ${customerClass}`}>
+                                  {customerLabel}
+                                </span>
+                              )}
+                              {mov.notes && (
+                                <span className="block truncate">{mov.notes}</span>
+                              )}
+                              <span className="block">{formatDate(mov.created_at)}</span>
+                            </p>
                           </TableCell>
                           <TableCell className="text-right font-medium">
                             {isOutbound ? "-" : "+"}
                             {mov.quantity}
                           </TableCell>
-                          <TableCell className="max-w-[240px] text-[#64748B]">
+                          <TableCell className="hidden max-w-[240px] text-[#64748B] sm:table-cell">
                             {customerLabel && (
                               <span
                                 className={`block text-xs font-medium ${customerClass}`}
@@ -244,7 +255,7 @@ export function MovementHistory({
                               {mov.notes || "—"}
                             </span>
                           </TableCell>
-                          <TableCell className="text-sm text-[#64748B]">
+                          <TableCell className="hidden text-sm text-[#64748B] md:table-cell">
                             {formatDate(mov.created_at)}
                           </TableCell>
                         </TableRow>

@@ -28,7 +28,7 @@ export default async function AdminLayout({
       <AdminSidebar user={user} />
       <SidebarInset>
         <AdminHeader />
-        <main className="flex-1 overflow-auto bg-slate-50 p-6">
+        <main className="flex-1 overflow-auto bg-slate-50 p-3 sm:p-4 lg:p-6">
           {children}
         </main>
       </SidebarInset>

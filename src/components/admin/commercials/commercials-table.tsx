@@ -57,8 +57,8 @@ export function CommercialsTable({ initialCommercials }: CommercialsTableProps) 
 
   return (
     <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <Input
             placeholder="Buscar por nombre o email..."
@@ -78,7 +78,7 @@ export function CommercialsTable({ initialCommercials }: CommercialsTableProps) 
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead className="hidden md:table-cell">Email</TableHead>
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="w-[100px]">Acciones</TableHead>
             </TableRow>
@@ -97,8 +97,11 @@ export function CommercialsTable({ initialCommercials }: CommercialsTableProps) 
                     <Link href={`/commercials/${commercial.id}`} className="hover:text-[#3B82F6] hover:underline">
                       {commercial.name}
                     </Link>
+                    <p className="text-xs font-normal text-[#64748B] md:hidden">
+                      {commercial.email}
+                    </p>
                   </TableCell>
-                  <TableCell className="text-[#64748B]">
+                  <TableCell className="hidden text-[#64748B] md:table-cell">
                     {commercial.email}
                   </TableCell>
                   <TableCell className="text-center">

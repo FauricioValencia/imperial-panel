@@ -194,23 +194,23 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
           ) : (
             <>
               {/* Resumen */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                 <Card>
                   <CardContent className="pt-4">
                     <p className="text-xs text-[#64748B]">Total pedidos</p>
-                    <p className="text-2xl font-bold text-[#1E293B]">{totalOrders}</p>
+                    <p className="text-xl font-bold text-[#1E293B] sm:text-2xl">{totalOrders}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4">
                     <p className="text-xs text-[#64748B]">Unidades entregadas</p>
-                    <p className="text-2xl font-bold text-[#1E293B]">{totalItems}</p>
+                    <p className="text-xl font-bold text-[#1E293B] sm:text-2xl">{totalItems}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4">
                     <p className="text-xs text-[#64748B]">Total ventas</p>
-                    <p className="text-2xl font-bold text-[#10B981]">{formatCurrency(totalAmount)}</p>
+                    <p className="text-xl font-bold text-[#10B981] sm:text-2xl">{formatCurrency(totalAmount)}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -221,10 +221,10 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Domiciliario</TableHead>
-                      <TableHead>Mes</TableHead>
-                      {productId !== "all" &&<TableHead>Producto</TableHead>}
-                      <TableHead className="text-center">Pedidos</TableHead>
-                      <TableHead className="text-center">Unidades</TableHead>
+                      <TableHead className="hidden md:table-cell">Mes</TableHead>
+                      {productId !== "all" && <TableHead className="hidden lg:table-cell">Producto</TableHead>}
+                      <TableHead className="hidden text-center sm:table-cell">Pedidos</TableHead>
+                      <TableHead className="hidden text-center sm:table-cell">Unidades</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -233,20 +233,25 @@ export function SalesReport({ couriers, products }: SalesReportProps) {
                       <TableRow key={i}>
                         <TableCell className="font-medium text-[#1E293B]">
                           {row.courier_name}
+                          <p className="text-xs font-normal text-[#64748B] md:hidden">
+                            {MONTHS.find((m) => m.value === String(row.month))?.label} {row.year}
+                            {" · "}
+                            {row.total_orders} ped · {row.total_items} und
+                          </p>
                         </TableCell>
-                        <TableCell className="text-[#64748B]">
+                        <TableCell className="hidden text-[#64748B] md:table-cell">
                           {MONTHS.find((m) => m.value === String(row.month))?.label} {row.year}
                         </TableCell>
-                        {productId !== "all" &&(
-                          <TableCell className="text-[#64748B]">
+                        {productId !== "all" && (
+                          <TableCell className="hidden text-[#64748B] lg:table-cell">
                             {row.product_codigo && (
                               <span className="mr-1 font-mono text-xs">[{row.product_codigo}]</span>
                             )}
                             {row.product_name}
                           </TableCell>
                         )}
-                        <TableCell className="text-center">{row.total_orders}</TableCell>
-                        <TableCell className="text-center">{row.total_items}</TableCell>
+                        <TableCell className="hidden text-center sm:table-cell">{row.total_orders}</TableCell>
+                        <TableCell className="hidden text-center sm:table-cell">{row.total_items}</TableCell>
                         <TableCell className="text-right font-medium text-[#1E293B]">
                           {formatCurrency(row.total_amount)}
                         </TableCell>

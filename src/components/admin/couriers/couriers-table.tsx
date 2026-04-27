@@ -58,8 +58,8 @@ export function CouriersTable({ initialCouriers, zones = [] }: CouriersTableProp
 
   return (
     <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
           <Input
             placeholder="Buscar por nombre o email..."
@@ -79,8 +79,8 @@ export function CouriersTable({ initialCouriers, zones = [] }: CouriersTableProp
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Zona</TableHead>
+              <TableHead className="hidden md:table-cell">Email</TableHead>
+              <TableHead className="hidden lg:table-cell">Zona</TableHead>
               <TableHead className="text-center">Estado</TableHead>
               <TableHead className="w-[100px]">Acciones</TableHead>
             </TableRow>
@@ -88,7 +88,7 @@ export function CouriersTable({ initialCouriers, zones = [] }: CouriersTableProp
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-[#64748B]">
+                <TableCell colSpan={5} className="text-center text-[#64748B]">
                   {search ? "No se encontraron domiciliarios" : "No hay domiciliarios registrados"}
                 </TableCell>
               </TableRow>
@@ -99,11 +99,14 @@ export function CouriersTable({ initialCouriers, zones = [] }: CouriersTableProp
                     <Link href={`/couriers/${courier.id}`} className="hover:text-[#3B82F6] hover:underline">
                       {courier.name}
                     </Link>
+                    <p className="text-xs font-normal text-[#64748B] md:hidden">
+                      {courier.email}
+                    </p>
                   </TableCell>
-                  <TableCell className="text-[#64748B]">
+                  <TableCell className="hidden text-[#64748B] md:table-cell">
                     {courier.email}
                   </TableCell>
-                  <TableCell className="text-[#64748B] text-sm">
+                  <TableCell className="hidden text-sm text-[#64748B] lg:table-cell">
                     {courier.zone
                       ? courier.zone.name
                       : zones.find((z) => z.id === courier.zone_id)?.name || "—"}
