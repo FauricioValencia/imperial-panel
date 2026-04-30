@@ -37,6 +37,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
 
   const [quantity, setQuantity] = useState<number>(0);
   const [unitCost, setUnitCost] = useState<number>(0);
+  const [suggestedPrice, setSuggestedPrice] = useState<number>(0);
   const [noExpiration, setNoExpiration] = useState(false);
 
   useEffect(() => {
@@ -46,21 +47,32 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
     prevSuccessRef.current = state.success;
   }, [state.success, onClose]);
 
+  // Reset al abrir el dialog: patron "reset state on prop change".
+  // Dialog de shadcn no desmonta el contenido cuando open cambia, asi que
+  // resetearmos manualmente. Linter de React 19 lo flagea pero es valido.
   useEffect(() => {
     if (open) {
       prevSuccessRef.current = false;
+      /* eslint-disable react-hooks/set-state-in-effect */
       setQuantity(0);
       setUnitCost(0);
+      setSuggestedPrice(product?.price ?? 0);
       setNoExpiration(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
-  }, [open]);
+  }, [open, product]);
 
+  // Preview de margen: usa suggested_price del lote si fue ingresado;
+  // si no, cae al precio del producto. Asi el admin puede experimentar
+  // con un precio distinto sin tocar el catalogo.
   const margin = useMemo(() => {
     if (!product || unitCost <= 0) return null;
-    const diff = product.price - unitCost;
-    const pct = product.price > 0 ? (diff / product.price) * 100 : 0;
-    return { diff, pct };
-  }, [product, unitCost]);
+    const referencePrice = suggestedPrice > 0 ? suggestedPrice : product.price;
+    if (referencePrice <= 0) return null;
+    const diff = referencePrice - unitCost;
+    const pct = (diff / referencePrice) * 100;
+    return { diff, pct, referencePrice, usingLotPrice: suggestedPrice > 0 };
+  }, [product, unitCost, suggestedPrice]);
 
   const totalInvestment = quantity > 0 && unitCost > 0 ? quantity * unitCost : 0;
 
@@ -127,6 +139,23 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="suggested_price">
+              Precio sugerido por lote
+              <span className="ml-2 text-xs font-normal text-[#64748B]">
+                (opcional · solo afecta el preview de margen)
+              </span>
+            </Label>
+            <CurrencyInput
+              id="suggested_price"
+              name="suggested_price"
+              value={suggestedPrice}
+              onValueChange={setSuggestedPrice}
+              disabled={isPending}
+              placeholder={String(product.price)}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="expires_at">Vencimiento</Label>
@@ -187,37 +216,60 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
             />
           </div>
 
-          {(totalInvestment > 0 || margin) && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
-              {totalInvestment > 0 && (
-                <p className="text-xs text-[#1E293B]">
-                  Inversión total:{" "}
-                  <strong>{formatCurrency(totalInvestment)}</strong>
-                </p>
-              )}
-              {margin && (
-                <p
-                  className={
-                    margin.diff >= 0
-                      ? "text-xs text-emerald-700"
-                      : "text-xs text-red-700"
-                  }
-                >
-                  {margin.diff >= 0 ? (
-                    <>
-                      Utilidad bruta unitaria:{" "}
-                      <strong>{formatCurrency(margin.diff)}</strong> ({margin.pct.toFixed(1)}%)
-                    </>
-                  ) : (
-                    <>
-                      Margen negativo: vendes a{" "}
-                      <strong>{formatCurrency(margin.diff)}</strong> por debajo del costo
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-          )}
+          {(totalInvestment > 0 || margin) && (() => {
+            // 3 zonas de margen: <0 perdida (rojo), 0-20% bajo (ambar),
+            // >=20% sano (verde). Coherente con badges de la tabla de lotes.
+            const tone = !margin
+              ? "neutral"
+              : margin.pct < 0
+              ? "loss"
+              : margin.pct < 20
+              ? "low"
+              : "ok";
+            const wrapperClass = {
+              neutral: "border-slate-200 bg-slate-50",
+              loss: "border-red-200 bg-red-50",
+              low: "border-amber-200 bg-amber-50",
+              ok: "border-emerald-200 bg-emerald-50",
+            }[tone];
+            const marginTextClass = {
+              loss: "text-red-700",
+              low: "text-amber-800",
+              ok: "text-emerald-700",
+              neutral: "text-[#1E293B]",
+            }[tone];
+            return (
+              <div className={`rounded-lg border p-3 space-y-1 ${wrapperClass}`}>
+                {totalInvestment > 0 && (
+                  <p className="text-xs text-[#1E293B]">
+                    Inversión total: <strong>{formatCurrency(totalInvestment)}</strong>
+                  </p>
+                )}
+                {margin && (
+                  <>
+                    <p className={`text-xs ${marginTextClass}`}>
+                      {margin.pct < 0 ? (
+                        <>
+                          Margen negativo: <strong>{formatCurrency(margin.diff)}</strong>{" "}
+                          por unidad ({margin.pct.toFixed(1)}%)
+                        </>
+                      ) : (
+                        <>
+                          Utilidad bruta unitaria:{" "}
+                          <strong>{formatCurrency(margin.diff)}</strong> ({margin.pct.toFixed(1)}%)
+                        </>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-[#64748B]">
+                      Calculado sobre{" "}
+                      {margin.usingLotPrice ? "el precio sugerido del lote" : "el precio del producto"}{" "}
+                      ({formatCurrency(margin.referencePrice)})
+                    </p>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>

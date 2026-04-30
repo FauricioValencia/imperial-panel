@@ -79,7 +79,7 @@ export async function createOrder(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  const { customer_id, items, notes } = result.data;
+  const { customer_id, items, notes, allow_loss } = result.data;
 
   // Validar stock vigente disponible antes de crear la orden.
   // stock_available = suma de quantity_remaining de lotes vigentes
@@ -123,6 +123,106 @@ export async function createOrder(
         error: `Stock vigente insuficiente para ${product.name}: ${product.stock_available} disponible, ${requiredQty} solicitado`,
       };
     }
+  }
+
+  // Validar margen proyectado FIFO contra unit_price.
+  // Simulamos el consumo de lotes que haria deduct_stock para anticipar
+  // el costo. Si unit_price < costo proyectado promedio ponderado, es
+  // una venta con perdida y requiere allow_loss explicito.
+  // Nota: hay un riesgo de race (lotes pueden cambiar entre validacion y
+  // entrega), pero deduct_stock fallara con stock insuficiente si pasa.
+  const nowIso = new Date().toISOString();
+  const { data: lotRows, error: lotsError } = await ctx.supabase
+    .from("product_lots")
+    .select("product_id, unit_cost, quantity_remaining, received_at, id")
+    .eq("admin_id", ctx.user.id)
+    .in("product_id", productIds)
+    .eq("active", true)
+    .gt("quantity_remaining", 0)
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+    .order("product_id", { ascending: true })
+    .order("received_at", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (lotsError) {
+    logError("create_order_margin_check", lotsError);
+    return { success: false, error: "Error verificando margen proyectado" };
+  }
+
+  // Agrupar lotes por producto (ya vienen ordenados FIFO en la query).
+  const lotsByProduct = new Map<
+    string,
+    { unit_cost: number; quantity_remaining: number }[]
+  >();
+  for (const lot of (lotRows ?? []) as {
+    product_id: string;
+    unit_cost: number;
+    quantity_remaining: number;
+  }[]) {
+    const arr = lotsByProduct.get(lot.product_id) ?? [];
+    arr.push({ unit_cost: Number(lot.unit_cost), quantity_remaining: lot.quantity_remaining });
+    lotsByProduct.set(lot.product_id, arr);
+  }
+
+  // Para cada item, simular consumo FIFO sobre los lotes restantes y
+  // calcular el costo promedio ponderado proyectado. Items duplicados del
+  // mismo producto consumen secuencialmente (el siguiente ve menos lotes).
+  const lossWarnings: {
+    product_id: string;
+    product_name: string;
+    unit_price: number;
+    projected_avg_cost: number;
+    margin_unit: number;
+  }[] = [];
+
+  for (const item of items) {
+    const lots = lotsByProduct.get(item.product_id) ?? [];
+    let remaining = item.quantity;
+    let totalCost = 0;
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const consume = Math.min(remaining, lot.quantity_remaining);
+      totalCost += consume * lot.unit_cost;
+      remaining -= consume;
+      lot.quantity_remaining -= consume;
+    }
+    if (remaining > 0) {
+      // No deberia pasar (validacion previa de stock_available), pero
+      // por seguridad: si no alcanzan los lotes vigentes, abortamos.
+      const product = stockMap.get(item.product_id);
+      return {
+        success: false,
+        error: `Stock vigente insuficiente para ${product?.name ?? item.product_id}`,
+      };
+    }
+    const projectedAvgCost = totalCost / item.quantity;
+    if (item.unit_price < projectedAvgCost) {
+      const product = stockMap.get(item.product_id)!;
+      lossWarnings.push({
+        product_id: item.product_id,
+        product_name: product.name,
+        unit_price: item.unit_price,
+        projected_avg_cost: projectedAvgCost,
+        margin_unit: item.unit_price - projectedAvgCost,
+      });
+    }
+  }
+
+  if (lossWarnings.length > 0 && !allow_loss) {
+    const first = lossWarnings[0];
+    const extra = lossWarnings.length > 1 ? ` (y ${lossWarnings.length - 1} mas)` : "";
+    return {
+      success: false,
+      error: `${first.product_name}: precio ${first.unit_price} es menor al costo proyectado ${first.projected_avg_cost.toFixed(2)}${extra}. Marca "permitir venta con perdida" si es intencional.`,
+    };
+  }
+
+  if (lossWarnings.length > 0 && allow_loss) {
+    logOperacion(
+      "order_created_with_loss_override",
+      { customer_id, loss_items: lossWarnings },
+      ctx.user.id
+    );
   }
 
   // Calculate total
@@ -337,6 +437,33 @@ export async function confirmDelivery(
     }
   }
 
+  // Server-side validation: cada returned_quantity debe corresponder a un
+  // order_item de esta orden y no exceder su quantity. El cliente ya valida
+  // pero un payload manipulado podria causar stock negativo o datos corruptos.
+  const itemIds = new Set(items.map((i) => i.id));
+  for (const [orderItemId, qty] of returnMap.entries()) {
+    if (!itemIds.has(orderItemId)) {
+      logError("confirm_delivery_invalid_item", new Error("returned item not in order"), {
+        order_id: orderId,
+        order_item_id: orderItemId,
+      });
+      return { success: false, error: "Item devuelto no pertenece a la orden" };
+    }
+    const item = items.find((i) => i.id === orderItemId)!;
+    if (qty > item.quantity) {
+      logError("confirm_delivery_excess_return", new Error("returned > ordered"), {
+        order_id: orderId,
+        order_item_id: orderItemId,
+        ordered: item.quantity,
+        returned: qty,
+      });
+      return {
+        success: false,
+        error: `Cantidad devuelta (${qty}) excede la cantidad del pedido (${item.quantity})`,
+      };
+    }
+  }
+
   // Determine the admin_id this courier belongs to (required by deduct_stock)
   const courierAdminId = ctx.user.admin_id;
   if (!courierAdminId) {
@@ -350,6 +477,16 @@ export async function confirmDelivery(
   // return_stock_by_item which reverts to the exact origin lot.
   let allReturned = true;
   const deductedItems: { order_item_id: string; quantity: number }[] = [];
+  // Allocations consumidas por lote (para audit log). Cada entrada captura
+  // que lote suministro cuanto y a que costo unitario, permitiendo trazar
+  // COGS por entrega sin depender de la vista lot_profitability_view.
+  const allocationsLog: {
+    order_item_id: string;
+    product_id: string;
+    lot_id: string;
+    allocated_qty: number;
+    unit_cost: number;
+  }[] = [];
 
   for (const item of items) {
     const returnedQty = returnMap.get(item.id) ?? 0;
@@ -358,7 +495,7 @@ export async function confirmDelivery(
     if (deliveredQty > 0) {
       allReturned = false;
 
-      const { error: stockError } = await ctx.supabase.rpc("deduct_stock", {
+      const { data: allocations, error: stockError } = await ctx.supabase.rpc("deduct_stock", {
         p_product_id: item.product_id,
         p_quantity: deliveredQty,
         p_admin_id: courierAdminId,
@@ -381,6 +518,20 @@ export async function confirmDelivery(
           success: false,
           error: stockError.message ?? "Error al descontar stock",
         };
+      }
+
+      // deduct_stock RETURNS TABLE(lot_id, allocated_qty, unit_cost): puede
+      // ser multi-fila si el FIFO consumio de varios lotes.
+      if (Array.isArray(allocations)) {
+        for (const a of allocations as { lot_id: string; allocated_qty: number; unit_cost: number }[]) {
+          allocationsLog.push({
+            order_item_id: item.id,
+            product_id: item.product_id,
+            lot_id: a.lot_id,
+            allocated_qty: a.allocated_qty,
+            unit_cost: a.unit_cost,
+          });
+        }
       }
 
       deductedItems.push({ order_item_id: item.id, quantity: deliveredQty });
@@ -428,10 +579,19 @@ export async function confirmDelivery(
     logError("confirm_delivery_balance", balanceError, { order_id: orderId });
   }
 
+  // COGS total real: suma del costo consumido por lote (incluye multi-lote
+  // por FIFO). Se calcula desde allocationsLog para auditoria financiera.
+  const totalCogs = allocationsLog.reduce(
+    (sum, a) => sum + a.allocated_qty * Number(a.unit_cost),
+    0
+  );
+
   logOperacion(hasReturns ? "delivery_confirmed_with_returns" : "delivery_confirmed", {
     order_id: orderId,
     status: finalStatus,
     returned_items: returnMap.size,
+    total_cogs: totalCogs,
+    allocations: allocationsLog,
   }, ctx.user.id);
 
   revalidatePath("/deliveries");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   Pencil,
   Trash2,
@@ -10,6 +10,8 @@ import {
   PackageMinus,
   History,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,8 +43,9 @@ import { StockEntryDialog } from "./stock-entry-dialog";
 import { OutboundDialog } from "./outbound-dialog";
 import { MovementHistory } from "./movement-history";
 import { deactivateProduct } from "@/actions/inventory";
+import { getInventoryValuation } from "@/actions/lot-analytics";
 import { formatCurrency } from "@/lib/format";
-import type { Customer, Product } from "@/types";
+import type { Customer, InventoryValuationRow, Product } from "@/types";
 
 interface ProductsTableProps {
   initialProducts: Product[];
@@ -92,6 +95,21 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
   const [outboundProduct, setOutboundProduct] = useState<Product | null>(null);
   const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+  // CPP lazy: solo se carga cuando el admin activa el toggle. Evita
+  // el fetch extra para usuarios que solo gestionan catalogo.
+  const [showCPP, setShowCPP] = useState(false);
+  const [valuationMap, setValuationMap] = useState<Map<string, InventoryValuationRow> | null>(null);
+
+  useEffect(() => {
+    if (!showCPP || valuationMap !== null) return;
+    getInventoryValuation().then((res) => {
+      if (res.success && res.data) {
+        setValuationMap(new Map(res.data.map((v) => [v.product_id, v])));
+      } else {
+        setValuationMap(new Map());
+      }
+    });
+  }, [showCPP, valuationMap]);
 
   const filtered = initialProducts.filter((p) => {
     const term = search.toLowerCase();
@@ -147,10 +165,28 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
             className="pl-9"
           />
         </div>
-        <Button onClick={handleNew} className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Producto
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCPP((v) => !v)}
+          >
+            {showCPP ? (
+              <>
+                <EyeOff className="mr-2 h-4 w-4" /> Ocultar CPP
+              </>
+            ) : (
+              <>
+                <Eye className="mr-2 h-4 w-4" /> Mostrar CPP
+              </>
+            )}
+          </Button>
+          <Button onClick={handleNew} className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       {/* Mobile cards (<md) */}
@@ -242,6 +278,12 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
               <TableHead>Nombre</TableHead>
               <TableHead className="hidden xl:table-cell">Descripcion</TableHead>
               <TableHead className="text-right">Precio</TableHead>
+              {showCPP && (
+                <>
+                  <TableHead className="text-right">CPP vigente</TableHead>
+                  <TableHead className="text-right">Valor inv.</TableHead>
+                </>
+              )}
               <TableHead className="text-center">Stock</TableHead>
               <TableHead className="w-[160px]">Acciones</TableHead>
             </TableRow>
@@ -249,12 +291,17 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-[#64748B]">
+                <TableCell
+                  colSpan={showCPP ? 8 : 6}
+                  className="text-center text-[#64748B]"
+                >
                   {search ? "No se encontraron productos" : "No hay productos registrados"}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((product) => (
+              filtered.map((product) => {
+                const valuation = showCPP ? valuationMap?.get(product.id) ?? null : null;
+                return (
                 <TableRow key={product.id}>
                   <TableCell className="hidden font-mono text-xs text-[#64748B] lg:table-cell">
                     {product.codigo || "—"}
@@ -268,6 +315,28 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
                   <TableCell className="text-right text-[#1E293B]">
                     {formatCurrency(product.price)}
                   </TableCell>
+                  {showCPP && (
+                    <>
+                      <TableCell className="text-right text-[#1E293B]">
+                        {valuationMap === null ? (
+                          <span className="text-xs text-[#64748B]">…</span>
+                        ) : valuation?.weighted_avg_cost != null ? (
+                          formatCurrency(Number(valuation.weighted_avg_cost))
+                        ) : (
+                          <span className="text-xs text-[#64748B]">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-[#1E293B]">
+                        {valuationMap === null ? (
+                          <span className="text-xs text-[#64748B]">…</span>
+                        ) : valuation ? (
+                          formatCurrency(Number(valuation.total_inventory_value))
+                        ) : (
+                          <span className="text-xs text-[#64748B]">—</span>
+                        )}
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-center">
                     <StockBadge product={product} />
                   </TableCell>
@@ -338,7 +407,8 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
                     </TooltipProvider>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

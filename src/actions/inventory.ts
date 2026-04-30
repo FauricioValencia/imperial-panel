@@ -226,11 +226,16 @@ export async function registerStockEntry(
 
   const noExpiration = formData.get("no_expiration") === "on";
   const expiresAtRaw = formData.get("expires_at") as string | null;
+  const suggestedPriceRaw = formData.get("suggested_price") as string | null;
 
   const raw = {
     product_id: formData.get("product_id") as string,
     quantity: Number(formData.get("quantity")),
     unit_cost: Number(formData.get("unit_cost")),
+    suggested_price:
+      suggestedPriceRaw && suggestedPriceRaw.trim().length > 0
+        ? Number(suggestedPriceRaw)
+        : undefined,
     lot_number: (formData.get("lot_number") as string) || undefined,
     expires_at: expiresAtRaw || undefined,
     no_expiration: noExpiration,
@@ -271,6 +276,21 @@ export async function registerStockEntry(
     return { success: false, error: `Error al crear lote: ${rpcError.message}` };
   }
 
+  // suggested_price es metadata informativa (preview de margen en UX),
+  // no entra en deduct_stock ni afecta ventas. Update directo es seguro
+  // porque la columna no esta en el REVOKE de invariantes y RLS filtra
+  // por admin_id.
+  if (lotId && result.data.suggested_price !== undefined) {
+    const { error: priceError } = await ctx.supabase
+      .from("product_lots")
+      .update({ suggested_price: result.data.suggested_price })
+      .eq("id", lotId)
+      .eq("admin_id", ctx.user.id);
+    if (priceError) {
+      logError("set_suggested_price", priceError, { lot_id: lotId });
+    }
+  }
+
   logOperacion(
     "stock_entry_with_lot",
     {
@@ -279,11 +299,11 @@ export async function registerStockEntry(
       lot_id: lotId,
       quantity: result.data.quantity,
       unit_cost: result.data.unit_cost,
+      suggested_price: result.data.suggested_price ?? null,
     },
     ctx.user.id
   );
 
-  void lotId;
   revalidatePath("/inventory");
   return { success: true };
 }

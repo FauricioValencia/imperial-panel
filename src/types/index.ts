@@ -64,6 +64,10 @@ export const stockEntryWithLotSchema = z
       .positive("La cantidad debe ser mayor a cero")
       .max(100000, "Cantidad demasiado alta para un solo lote"),
     unit_cost: z.number().min(0, "El costo no puede ser negativo"),
+    suggested_price: z
+      .number()
+      .min(0, "El precio sugerido no puede ser negativo")
+      .optional(),
     lot_number: z
       .string()
       .max(50, "El numero de lote no puede superar 50 caracteres")
@@ -120,6 +124,9 @@ export const createOrderSchema = z.object({
   customer_id: z.string().uuid(),
   items: z.array(orderItemSchema).min(1, "Must have at least one item"),
   notes: z.string().optional(),
+  // Override del check de margen: si true, permite vender por debajo del
+  // costo proyectado FIFO. Se loguea con auditoria.
+  allow_loss: z.boolean().optional(),
 });
 
 export const assignCourierSchema = z.object({
@@ -295,6 +302,7 @@ export interface ProductLot {
   lot_number: string;
   unit_cost: number;
   is_estimated_cost: boolean;
+  suggested_price: number | null;
   quantity_received: number;
   quantity_remaining: number;
   received_at: string;
@@ -304,6 +312,57 @@ export interface ProductLot {
   active: boolean;
   created_at: string;
   product?: Product;
+}
+
+export interface LotProfitabilityRow {
+  allocation_id: string;
+  lot_id: string;
+  lot_number: string;
+  product_id: string;
+  product_name: string;
+  product_code: string | null;
+  order_item_id: string;
+  order_id: string;
+  order_status: OrderStatus;
+  delivered_at: string | null;
+  admin_id: string;
+  quantity_sold: number;
+  unit_cost_snapshot: number;
+  unit_price: number;
+  unit_margin: number;
+  total_cost: number;
+  total_revenue: number;
+  total_margin: number;
+  margin_percent: number | null;
+  allocated_at: string;
+}
+
+export interface InventoryValuationRow {
+  product_id: string;
+  product_name: string;
+  product_code: string | null;
+  admin_id: string;
+  active_lots_count: number;
+  total_units_available: number;
+  total_inventory_value: number;
+  weighted_avg_cost: number | null;
+  min_lot_cost: number;
+  max_lot_cost: number;
+}
+
+export interface MonthlyCogsRow {
+  admin_id: string;
+  product_id: string;
+  product_name: string;
+  product_code: string | null;
+  month: string;
+  units_sold: number;
+  total_cogs: number;
+  total_revenue: number;
+  total_margin: number;
+  margin_percent: number | null;
+  items_count: number;
+  orders_count: number;
 }
 
 export interface OutboundLotAllocation {

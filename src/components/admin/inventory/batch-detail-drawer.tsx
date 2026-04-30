@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Package, Calendar, Truck, AlertTriangle, X, Save, Lock } from "lucide-react";
+import { Calendar, Truck, AlertTriangle, X, Save, Lock } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -25,8 +25,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { closeBatch, getBatch, updateBatch } from "@/actions/inventory";
+import { getLotProfitability } from "@/actions/lot-analytics";
 import { formatCurrency } from "@/lib/format";
-import type { BatchDetail } from "@/types";
+import type { BatchDetail, LotProfitabilityRow } from "@/types";
 
 interface BatchDetailDrawerProps {
   lotId: string | null;
@@ -68,14 +69,21 @@ function formatDateTime(value: string | null | undefined): string {
 
 export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
   const [detail, setDetail] = useState<BatchDetail | null>(null);
+  const [profitability, setProfitability] = useState<LotProfitabilityRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [closing, setClosing] = useState(false);
 
+  // Reset + fetch al cambiar de lote: patron "reset state on prop change".
+  // Linter estricto de React 19 reporta setState dentro de effect, pero aqui
+  // sincronizamos un fetch con cambio de prop (no hay key disponible porque
+  // el drawer es un singleton montado una vez).
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!lotId) {
       setDetail(null);
+      setProfitability([]);
       setError(null);
       setEditing(false);
       setClosing(false);
@@ -83,21 +91,30 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
     }
     setLoading(true);
     setError(null);
-    getBatch(lotId).then((res) => {
-      if (res.success && res.data) {
-        setDetail(res.data);
-      } else {
-        setError(res.error ?? "Error al cargar el lote");
+    Promise.all([getBatch(lotId), getLotProfitability(lotId)]).then(
+      ([detailRes, profRes]) => {
+        if (detailRes.success && detailRes.data) {
+          setDetail(detailRes.data);
+        } else {
+          setError(detailRes.error ?? "Error al cargar el lote");
+        }
+        if (profRes.success && profRes.data) {
+          setProfitability(profRes.data);
+        }
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [lotId]);
 
   function refresh() {
     if (!lotId) return;
-    getBatch(lotId).then((res) => {
-      if (res.success && res.data) setDetail(res.data);
-    });
+    Promise.all([getBatch(lotId), getLotProfitability(lotId)]).then(
+      ([detailRes, profRes]) => {
+        if (detailRes.success && detailRes.data) setDetail(detailRes.data);
+        if (profRes.success && profRes.data) setProfitability(profRes.data);
+      }
+    );
   }
 
   return (
@@ -128,7 +145,7 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
 
             <Separator />
 
-            <BatchCost detail={detail} />
+            <BatchFinancialAnalysis detail={detail} profitability={profitability} />
 
             <Separator />
 
@@ -267,13 +284,46 @@ function BatchInventory({ detail }: { detail: BatchDetail }) {
   );
 }
 
-function BatchCost({ detail }: { detail: BatchDetail }) {
+function marginToneClass(percent: number): string {
+  if (percent < 0) return "text-[#EF4444]";
+  if (percent < 20) return "text-[#F59E0B]";
+  return "text-[#10B981]";
+}
+
+function BatchFinancialAnalysis({
+  detail,
+  profitability,
+}: {
+  detail: BatchDetail;
+  profitability: LotProfitabilityRow[];
+}) {
   const totalInvestment = detail.unit_cost * detail.quantity_received;
   const remainingValue = detail.unit_cost * detail.quantity_remaining;
 
+  // Margen estimado: usa suggested_price del lote si existe, si no
+  // product.price. Coherente con la columna de la tabla y el preview
+  // del form de creacion.
+  const referencePrice = detail.suggested_price ?? detail.product.price;
+  const estimatedUnitMargin = referencePrice - detail.unit_cost;
+  const estimatedMarginPct =
+    referencePrice > 0 ? (estimatedUnitMargin / referencePrice) * 100 : 0;
+  const priceSource = detail.suggested_price !== null ? "lote" : "producto";
+
+  // Rentabilidad real: suma de allocations entregadas (vista filtra
+  // status delivered/partial). Si esta vacia, no hubo ventas entregadas.
+  const hasRealSales = profitability.length > 0;
+  const realRevenue = profitability.reduce((s, p) => s + Number(p.total_revenue), 0);
+  const realCogs = profitability.reduce((s, p) => s + Number(p.total_cost), 0);
+  const realMargin = realRevenue - realCogs;
+  const realMarginPct = realRevenue > 0 ? (realMargin / realRevenue) * 100 : 0;
+  const realQtySold = profitability.reduce((s, p) => s + Number(p.quantity_sold), 0);
+
   return (
-    <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Costo</h3>
+    <div className="space-y-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+        Análisis financiero
+      </h3>
+
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-[#64748B]">Costo unitario</p>
@@ -285,18 +335,63 @@ function BatchCost({ detail }: { detail: BatchDetail }) {
           </p>
         </div>
         <div>
-          <p className="text-[#64748B]">Precio venta</p>
-          <p className="font-semibold text-[#1E293B]">{formatCurrency(detail.product.price)}</p>
+          <p className="text-[#64748B]">
+            Precio referencia <span className="text-[10px]">({priceSource})</span>
+          </p>
+          <p className="font-semibold text-[#1E293B]">{formatCurrency(referencePrice)}</p>
         </div>
         <div>
-          <p className="text-[#64748B]">Inversion total</p>
+          <p className="text-[#64748B]">Margen estimado</p>
+          <p className={`font-semibold ${marginToneClass(estimatedMarginPct)}`}>
+            {formatCurrency(estimatedUnitMargin)}{" "}
+            <span className="text-xs">({estimatedMarginPct.toFixed(1)}%)</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[#64748B]">Inversión total</p>
           <p className="font-semibold text-[#1E293B]">{formatCurrency(totalInvestment)}</p>
         </div>
         <div>
           <p className="text-[#64748B]">Valor vigente</p>
           <p className="font-semibold text-[#10B981]">{formatCurrency(remainingValue)}</p>
         </div>
+        <div>
+          <p className="text-[#64748B]">Rentabilidad esperada</p>
+          <p className={`font-semibold ${marginToneClass(estimatedMarginPct)}`}>
+            {formatCurrency(estimatedUnitMargin * detail.quantity_received)}
+          </p>
+        </div>
       </div>
+
+      {hasRealSales && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+            Rentabilidad real ({realQtySold} unidades vendidas)
+          </p>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-[#64748B]">Ingresos</p>
+              <p className="font-semibold text-[#1E293B]">{formatCurrency(realRevenue)}</p>
+            </div>
+            <div>
+              <p className="text-[#64748B]">COGS real</p>
+              <p className="font-semibold text-[#1E293B]">{formatCurrency(realCogs)}</p>
+            </div>
+            <div>
+              <p className="text-[#64748B]">Margen real</p>
+              <p className={`font-semibold ${marginToneClass(realMarginPct)}`}>
+                {formatCurrency(realMargin)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[#64748B]">Margen %</p>
+              <p className={`font-semibold ${marginToneClass(realMarginPct)}`}>
+                {realMarginPct.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
