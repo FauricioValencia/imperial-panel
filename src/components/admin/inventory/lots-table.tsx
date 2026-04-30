@@ -65,7 +65,84 @@ export function LotsTable({ lots }: LotsTableProps) {
         />
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
+      {/* Mobile cards (<md) */}
+      <div className="space-y-3 md:hidden">
+        {filtered.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-[#64748B]">
+            {search ? "No se encontraron lotes" : "No hay lotes registrados"}
+          </div>
+        ) : (
+          filtered.map((lot) => {
+            const st = lotStatus(lot);
+            return (
+              <button
+                key={lot.id}
+                type="button"
+                onClick={() => setSelectedLotId(lot.id)}
+                className="block w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors hover:bg-slate-50"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-xs text-[#1E3A5F]">
+                      {lot.lot_number}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-medium text-[#1E293B]">
+                      {lot.product?.name ?? "—"}
+                    </p>
+                    {lot.product?.codigo && (
+                      <p className="font-mono text-[10px] text-[#64748B]">
+                        {lot.product.codigo}
+                      </p>
+                    )}
+                  </div>
+                  <Badge className={`${st.className} shrink-0`}>{st.label}</Badge>
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2 text-xs">
+                  <div>
+                    <p className="text-[#64748B]">Restante</p>
+                    <p className="font-semibold text-[#10B981]">
+                      {lot.quantity_remaining}
+                      <span className="ml-1 font-normal text-[#64748B]">
+                        / {lot.quantity_received}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#64748B]">Costo</p>
+                    <p className="font-medium text-[#1E293B]">
+                      {formatCurrency(lot.unit_cost)}
+                      {lot.is_estimated_cost && (
+                        <span className="ml-1 text-[9px] text-[#F59E0B]">est.</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#64748B]">Vence</p>
+                    <p className="font-medium text-[#1E293B]">
+                      {lot.expires_at
+                        ? new Date(lot.expires_at).toLocaleDateString("es-CO", {
+                            day: "2-digit",
+                            month: "short",
+                          })
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {lot.supplier && (
+                  <p className="mt-2 truncate text-[10px] text-[#64748B]">
+                    Proveedor: {lot.supplier}
+                  </p>
+                )}
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop table (md+) */}
+      <div className="hidden rounded-lg border border-slate-200 bg-white md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -74,7 +151,7 @@ export function LotsTable({ lots }: LotsTableProps) {
               <TableHead className="text-right">Recibido</TableHead>
               <TableHead className="text-right">Restante</TableHead>
               <TableHead className="text-right">Costo unit.</TableHead>
-              <TableHead className="hidden md:table-cell">Vencimiento</TableHead>
+              <TableHead>Vencimiento</TableHead>
               <TableHead className="hidden lg:table-cell">Proveedor</TableHead>
               <TableHead className="text-center">Estado</TableHead>
             </TableRow>
@@ -123,7 +200,7 @@ export function LotsTable({ lots }: LotsTableProps) {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-[#64748B]">
+                    <TableCell className="text-[#64748B]">
                       {lot.expires_at
                         ? new Date(lot.expires_at).toLocaleDateString("es-CO")
                         : "Sin vencimiento"}
