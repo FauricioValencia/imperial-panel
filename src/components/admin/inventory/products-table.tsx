@@ -50,24 +50,37 @@ interface ProductsTableProps {
 }
 
 function StockBadge({ product }: { product: Product }) {
-  const lowStock = product.stock <= product.min_stock;
-  const outOfStock = product.stock === 0;
+  // stock_available es la cifra vigente (vendible). product.stock incluye
+  // unidades en lotes vencidos que no se pueden asignar.
+  const available = product.stock_available;
+  const lowStock = available <= product.min_stock;
+  const outOfStock = available === 0;
+  const blocked = product.stock - available;
+
+  const blockedHint = blocked > 0 ? ` · ${blocked} bloqueado` : "";
 
   if (outOfStock) {
     return (
-      <Badge variant="destructive" className="bg-[#EF4444]">
-        Agotado
+      <Badge variant="destructive" className="bg-[#EF4444]" title={`Disponible para venta${blockedHint}`}>
+        Agotado{blocked > 0 ? ` (${blocked} vencido)` : ""}
       </Badge>
     );
   }
   if (lowStock) {
     return (
-      <Badge className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]">
-        {product.stock} (min: {product.min_stock})
+      <Badge
+        className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]"
+        title={`Disponible vigente${blockedHint}`}
+      >
+        {available} (min: {product.min_stock})
       </Badge>
     );
   }
-  return <span className="font-medium text-[#10B981]">{product.stock}</span>;
+  return (
+    <span className="font-medium text-[#10B981]" title={`Disponible vigente${blockedHint}`}>
+      {available}
+    </span>
+  );
 }
 
 export function ProductsTable({ initialProducts, customers = [] }: ProductsTableProps) {
@@ -89,7 +102,7 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
   });
 
   const lowStockCount = initialProducts.filter(
-    (p) => p.stock <= p.min_stock
+    (p) => p.stock_available <= p.min_stock
   ).length;
 
   function handleEdit(product: Product) {
@@ -188,7 +201,7 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
                 </button>
                 <button
                   onClick={() => setOutboundProduct(product)}
-                  disabled={product.stock === 0}
+                  disabled={product.stock_available === 0}
                   className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#F59E0B] hover:bg-amber-50 disabled:opacity-40"
                 >
                   <PackageMinus className="h-3.5 w-3.5" />
@@ -278,7 +291,7 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
                             <button
                               onClick={() => setOutboundProduct(product)}
                               className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#F59E0B]"
-                              disabled={product.stock === 0}
+                              disabled={product.stock_available === 0}
                             >
                               <PackageMinus className="h-4 w-4" />
                             </button>

@@ -6,10 +6,16 @@ import {
   productSchema,
   registerOutboundSchema,
   stockEntryWithLotSchema,
+  closeBatchSchema,
+  updateBatchSchema,
   type ActionResponse,
   type Product,
   type ProductLot,
   type InventoryMovement,
+  type BatchDetail,
+  type BatchAllocationTrace,
+  type CloseBatchInput,
+  type UpdateBatchInput,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
 
@@ -350,6 +356,200 @@ export async function listExpiringLots(daysAhead = 30): Promise<ActionResponse<P
   }
 
   return { success: true, data: data as ProductLot[] };
+}
+
+export async function getBatch(lotId: string): Promise<ActionResponse<BatchDetail>> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const { data: lot, error: lotError } = await ctx.supabase
+    .from("product_lots")
+    .select("*, product:products(*)")
+    .eq("id", lotId)
+    .eq("admin_id", ctx.user.id)
+    .single();
+
+  if (lotError || !lot) {
+    return { success: false, error: "Lote no encontrado" };
+  }
+
+  const { data: rawAllocs, error: allocError } = await ctx.supabase
+    .from("outbound_lot_allocations")
+    .select(
+      `id, order_item_id, quantity, unit_cost_snapshot, created_at,
+       order_item:order_items!order_item_id(
+         order_id,
+         order:orders!order_id(
+           id, status, delivered_at,
+           customer:customers!customer_id(id, name)
+         )
+       )`
+    )
+    .eq("lot_id", lotId)
+    .order("created_at", { ascending: false });
+
+  if (allocError) {
+    logError("get_batch_allocations", allocError, { lot_id: lotId });
+    return { success: false, error: "Error al cargar asignaciones del lote" };
+  }
+
+  // Supabase tipa las relaciones embebidas como arrays aunque sean 1-a-1.
+  // Tomamos siempre el primer elemento.
+  type RawJoined<T> = T | T[] | null | undefined;
+  type RawCustomer = { id: string; name: string };
+  type RawOrder = {
+    id: string;
+    status: string;
+    delivered_at: string | null;
+    customer: RawJoined<RawCustomer>;
+  };
+  type RawOrderItem = {
+    order_id: string;
+    order: RawJoined<RawOrder>;
+  };
+  type RawAlloc = {
+    id: string;
+    order_item_id: string;
+    quantity: number;
+    unit_cost_snapshot: number;
+    created_at: string;
+    order_item: RawJoined<RawOrderItem>;
+  };
+
+  const pick = <T,>(value: RawJoined<T>): T | null => {
+    if (!value) return null;
+    return Array.isArray(value) ? value[0] ?? null : value;
+  };
+
+  const allocations: BatchAllocationTrace[] = ((rawAllocs as RawAlloc[] | null) ?? []).map((a) => {
+    const item = pick(a.order_item);
+    const order = pick(item?.order);
+    const customer = pick(order?.customer);
+    return {
+      allocation_id: a.id,
+      order_id: order?.id ?? "",
+      order_status: (order?.status ?? "pending") as BatchAllocationTrace["order_status"],
+      customer_id: customer?.id ?? "",
+      customer_name: customer?.name ?? "—",
+      order_item_id: a.order_item_id,
+      quantity: a.quantity,
+      unit_cost_snapshot: a.unit_cost_snapshot,
+      delivered_at: order?.delivered_at ?? null,
+      created_at: a.created_at,
+    };
+  });
+
+  const { data: movements, error: movError } = await ctx.supabase
+    .from("inventory_movements")
+    .select("*, sample_customer:customers(id, name)")
+    .eq("lot_id", lotId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (movError) {
+    logError("get_batch_movements", movError, { lot_id: lotId });
+    return { success: false, error: "Error al cargar movimientos del lote" };
+  }
+
+  const ACTIVE_STATUSES = new Set(["pending", "assigned", "in_transit"]);
+  const totalAllocatedActive = allocations
+    .filter((a) => ACTIVE_STATUSES.has(a.order_status))
+    .reduce((sum, a) => sum + a.quantity, 0);
+
+  const detail: BatchDetail = {
+    ...(lot as ProductLot),
+    product: (lot as ProductLot & { product: Product }).product,
+    allocations,
+    movements: (movements as InventoryMovement[]) ?? [],
+    total_allocated_active: totalAllocatedActive,
+    consumed_quantity: lot.quantity_received - lot.quantity_remaining,
+  };
+
+  return { success: true, data: detail };
+}
+
+export async function closeBatch(
+  input: CloseBatchInput
+): Promise<ActionResponse> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const result = closeBatchSchema.safeParse(input);
+  if (!result.success) {
+    return { success: false, error: result.error.issues[0].message };
+  }
+
+  const { lot_id, force, reason } = result.data;
+
+  const { error } = await ctx.supabase.rpc("close_lot", {
+    p_lot_id: lot_id,
+    p_admin_id: ctx.user.id,
+    p_force: force ?? false,
+    p_reason: reason ?? null,
+  });
+
+  if (error) {
+    logError("close_batch", error, { lot_id });
+    return { success: false, error: error.message };
+  }
+
+  logOperacion(
+    "batch_closed",
+    { lot_id, force: force ?? false, reason: reason ?? null },
+    ctx.user.id
+  );
+
+  revalidatePath("/inventory");
+  return { success: true };
+}
+
+export async function updateBatch(
+  input: UpdateBatchInput
+): Promise<ActionResponse> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const result = updateBatchSchema.safeParse(input);
+  if (!result.success) {
+    return { success: false, error: result.error.issues[0].message };
+  }
+
+  const { lot_id, supplier, notes, expires_at, clear_expiration, lot_number } = result.data;
+
+  const { error } = await ctx.supabase.rpc("update_lot_metadata", {
+    p_lot_id: lot_id,
+    p_admin_id: ctx.user.id,
+    p_supplier: supplier ?? null,
+    p_notes: notes ?? null,
+    p_expires_at: expires_at ?? null,
+    p_lot_number: lot_number ?? null,
+    p_clear_expiration: clear_expiration ?? false,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "Ya existe un lote con ese numero" };
+    }
+    logError("update_batch", error, { lot_id });
+    return { success: false, error: error.message };
+  }
+
+  logOperacion(
+    "batch_updated",
+    {
+      lot_id,
+      changed_fields: {
+        supplier: supplier !== undefined,
+        notes: notes !== undefined,
+        expires_at: expires_at !== undefined || clear_expiration === true,
+        lot_number: lot_number !== undefined,
+      },
+    },
+    ctx.user.id
+  );
+
+  revalidatePath("/inventory");
+  return { success: true };
 }
 
 export async function registerOutbound(

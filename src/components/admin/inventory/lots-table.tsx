@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { BatchDetailDrawer } from "./batch-detail-drawer";
 import type { ProductLot } from "@/types";
 
 interface LotsTableProps {
@@ -38,6 +39,7 @@ function lotStatus(lot: ProductLot): { label: string; className: string } {
 
 export function LotsTable({ lots }: LotsTableProps) {
   const [search, setSearch] = useState("");
+  const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
@@ -88,7 +90,11 @@ export function LotsTable({ lots }: LotsTableProps) {
               filtered.map((lot) => {
                 const st = lotStatus(lot);
                 return (
-                  <TableRow key={lot.id}>
+                  <TableRow
+                    key={lot.id}
+                    onClick={() => setSelectedLotId(lot.id)}
+                    className="cursor-pointer hover:bg-slate-50"
+                  >
                     <TableCell className="font-mono text-xs text-[#1E293B]">
                       {lot.lot_number}
                     </TableCell>
@@ -135,6 +141,11 @@ export function LotsTable({ lots }: LotsTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      <BatchDetailDrawer
+        lotId={selectedLotId}
+        onClose={() => setSelectedLotId(null)}
+      />
     </div>
   );
 }

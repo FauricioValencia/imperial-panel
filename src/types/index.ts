@@ -38,35 +38,77 @@ export const customerSchema = z.object({
   commercial_id: z.string().uuid().optional(),
 });
 
+// Acepta letras, numeros, guiones y guiones bajos. Hasta 50 chars.
+const lotNumberRegex = /^[A-Za-z0-9_-]+$/;
+
 export const productSchema = z.object({
   name: z.string().min(2, "Name required"),
   codigo: z.string().min(1).optional(),
   description: z.string().optional(),
   price: z.number().positive("Price must be positive"),
-  stock: z.number().int().min(0, "Stock cannot be negative"),
+  stock: z.number().int().min(0, "Stock cannot be negative").max(100000, "Stock inicial demasiado alto"),
   min_stock: z.number().int().min(0).default(5),
   // Optional initial lot data when creating a product with stock > 0
-  initial_unit_cost: z.number().min(0).optional(),
+  initial_unit_cost: z.number().min(0, "El costo no puede ser negativo").optional(),
   initial_expires_at: z.string().optional(),
   initial_no_expiration: z.boolean().optional(),
-  initial_supplier: z.string().optional(),
+  initial_supplier: z.string().max(100).optional(),
 });
 
 export const stockEntryWithLotSchema = z
   .object({
     product_id: z.string().uuid(),
-    quantity: z.number().int().positive("La cantidad debe ser mayor a cero"),
+    quantity: z
+      .number()
+      .int()
+      .positive("La cantidad debe ser mayor a cero")
+      .max(100000, "Cantidad demasiado alta para un solo lote"),
     unit_cost: z.number().min(0, "El costo no puede ser negativo"),
-    lot_number: z.string().optional(),
+    lot_number: z
+      .string()
+      .max(50, "El numero de lote no puede superar 50 caracteres")
+      .regex(lotNumberRegex, "Solo letras, numeros, guiones y guiones bajos")
+      .optional(),
     expires_at: z.string().optional(),
     no_expiration: z.boolean().optional(),
-    supplier: z.string().optional(),
-    notes: z.string().optional(),
+    supplier: z.string().max(100).optional(),
+    notes: z.string().max(500).optional(),
   })
   .refine((d) => d.no_expiration || !!d.expires_at, {
     message: "Indica fecha de vencimiento o marca producto no perecedero",
     path: ["expires_at"],
+  })
+  .refine(
+    (d) => d.no_expiration || !d.expires_at || new Date(d.expires_at).getTime() > Date.now(),
+    {
+      message: "La fecha de vencimiento debe ser futura",
+      path: ["expires_at"],
+    }
+  );
+
+export const closeBatchSchema = z
+  .object({
+    lot_id: z.string().uuid(),
+    force: z.boolean().optional(),
+    reason: z.string().max(500).optional(),
+  })
+  .refine((d) => !d.force || (d.reason !== undefined && d.reason.trim().length > 0), {
+    message: "Indica la razon del cierre forzado",
+    path: ["reason"],
   });
+
+export const updateBatchSchema = z.object({
+  lot_id: z.string().uuid(),
+  supplier: z.string().max(100).optional(),
+  notes: z.string().max(500).optional(),
+  expires_at: z.string().optional(),
+  clear_expiration: z.boolean().optional(),
+  lot_number: z
+    .string()
+    .max(50)
+    .regex(lotNumberRegex, "Solo letras, numeros, guiones y guiones bajos")
+    .optional(),
+});
 
 export const orderItemSchema = z.object({
   product_id: z.string().uuid(),
@@ -176,6 +218,8 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type StockEntryWithLotInput = z.infer<typeof stockEntryWithLotSchema>;
+export type CloseBatchInput = z.infer<typeof closeBatchSchema>;
+export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
@@ -270,6 +314,27 @@ export interface OutboundLotAllocation {
   unit_cost_snapshot: number;
   admin_id: string;
   created_at: string;
+}
+
+export interface BatchAllocationTrace {
+  allocation_id: string;
+  order_id: string;
+  order_status: OrderStatus;
+  customer_id: string;
+  customer_name: string;
+  order_item_id: string;
+  quantity: number;
+  unit_cost_snapshot: number;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface BatchDetail extends ProductLot {
+  product: Product;
+  allocations: BatchAllocationTrace[];
+  movements: InventoryMovement[];
+  total_allocated_active: number;
+  consumed_quantity: number;
 }
 
 export interface Order {

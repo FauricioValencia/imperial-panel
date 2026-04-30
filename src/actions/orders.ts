@@ -81,6 +81,50 @@ export async function createOrder(
 
   const { customer_id, items, notes } = result.data;
 
+  // Validar stock vigente disponible antes de crear la orden.
+  // stock_available = suma de quantity_remaining de lotes vigentes
+  // (no vencidos, activos). Es la cifra que deduct_stock realmente
+  // puede consumir; products.stock incluye vencidos bloqueados.
+  const productIds = Array.from(new Set(items.map((i) => i.product_id)));
+  const { data: stockRows, error: stockFetchError } = await ctx.supabase
+    .from("products")
+    .select("id, name, stock_available")
+    .eq("admin_id", ctx.user.id)
+    .in("id", productIds);
+
+  if (stockFetchError) {
+    logError("create_order_stock_check", stockFetchError);
+    return { success: false, error: "Error verificando stock disponible" };
+  }
+
+  const stockMap = new Map(
+    (stockRows as { id: string; name: string; stock_available: number }[] | null)?.map((p) => [
+      p.id,
+      p,
+    ]) ?? []
+  );
+
+  const requiredByProduct = new Map<string, number>();
+  for (const item of items) {
+    requiredByProduct.set(
+      item.product_id,
+      (requiredByProduct.get(item.product_id) ?? 0) + item.quantity
+    );
+  }
+
+  for (const [productId, requiredQty] of requiredByProduct) {
+    const product = stockMap.get(productId);
+    if (!product) {
+      return { success: false, error: "Producto no encontrado" };
+    }
+    if (product.stock_available < requiredQty) {
+      return {
+        success: false,
+        error: `Stock vigente insuficiente para ${product.name}: ${product.stock_available} disponible, ${requiredQty} solicitado`,
+      };
+    }
+  }
+
   // Calculate total
   const total = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
 

@@ -40,7 +40,7 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
 
   const parsedQuantity = Number.parseInt(quantity, 10);
   const validQuantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0;
-  const remainingStock = validQuantity ? product.stock - parsedQuantity : product.stock;
+  const remainingStock = validQuantity ? product.stock_available - parsedQuantity : product.stock_available;
   const belowMinStock =
     validQuantity && remainingStock > 0 && remainingStock < product.min_stock;
   const willBeZeroOrNegative = validQuantity && remainingStock <= 0;
@@ -48,7 +48,7 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
   const submitDisabled =
     isPending ||
     !validQuantity ||
-    parsedQuantity > product.stock ||
+    parsedQuantity > product.stock_available ||
     (reason === "muestra" && !selectedCustomerId);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
             <span className="text-[#64748B]">Stock actual: </span>
-            <span className="font-semibold text-[#1E293B]">{product.stock} unidades</span>
+            <span className="font-semibold text-[#1E293B]">{product.stock_available} unidades</span>
           </div>
 
           <div className="space-y-2">
@@ -135,14 +135,14 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
               name="quantity"
               type="number"
               min="1"
-              max={product.stock}
+              max={product.stock_available}
               required
               disabled={isPending}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               className="min-h-11"
             />
-            {validQuantity && parsedQuantity <= product.stock && (
+            {validQuantity && parsedQuantity <= product.stock_available && (
               <p
                 className={
                   willBeZeroOrNegative
@@ -159,7 +159,7 @@ export function OutboundDialog({ open, onClose, product, customers }: OutboundDi
                     : `Quedará: ${remainingStock} unidades`}
               </p>
             )}
-            {validQuantity && parsedQuantity > product.stock && (
+            {validQuantity && parsedQuantity > product.stock_available && (
               <p className="text-xs font-medium text-[#EF4444]">
                 Cantidad supera el stock disponible
               </p>

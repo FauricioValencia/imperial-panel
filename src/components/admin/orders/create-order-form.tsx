@@ -79,14 +79,14 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
   }
 
   const availableProducts = products.filter(
-    (p) => p.stock > 0 && !items.some((i) => i.product_id === p.id)
+    (p) => p.stock_available > 0 && !items.some((i) => i.product_id === p.id)
   );
 
   function handleAddItem() {
     const product = products.find((p) => p.id === selectedProduct);
     if (!product) return;
 
-    const qty = Math.min(quantity, product.stock);
+    const qty = Math.min(quantity, product.stock_available);
     if (qty <= 0) return;
 
     setItems([
@@ -96,7 +96,7 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
         product_name: product.name,
         quantity: qty,
         unit_price: product.price,
-        max_stock: product.stock,
+        max_stock: product.stock_available,
       },
     ]);
     setSelectedProduct("");
@@ -229,7 +229,7 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
                 <SelectContent>
                   {availableProducts.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.name} — {formatCurrency(p.price)} (stock: {p.stock})
+                      {p.name} — {formatCurrency(p.price)} (disponible: {p.stock_available})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -239,7 +239,7 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
               <Input
                 type="number"
                 min={1}
-                max={products.find((p) => p.id === selectedProduct)?.stock || 999}
+                max={products.find((p) => p.id === selectedProduct)?.stock_available || 999}
                 value={quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
                 placeholder="Cant."
