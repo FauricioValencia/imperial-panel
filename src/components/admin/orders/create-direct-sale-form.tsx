@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,15 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OrderItemsSummary } from "@/components/admin/orders/order-items-summary";
 import { createDirectSale } from "@/actions/direct-sale";
 import { formatCurrency } from "@/lib/format";
 import type { Customer, DirectSaleProductOption, PaymentMethod } from "@/types";
@@ -56,8 +49,6 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
   const [pagoInmediato, setPagoInmediato] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [allowLoss, setAllowLoss] = useState(false);
-
-  const total = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const filteredCustomers = customers.filter((c) => {
@@ -269,53 +260,7 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
           </div>
 
           {items.length > 0 && (
-            <div className="-mx-1 overflow-x-auto rounded-lg border border-slate-200 sm:mx-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead className="text-center">Cant.</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-right">Subtotal</TableHead>
-                    <TableHead className="w-[50px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.product_id}>
-                      <TableCell className="font-medium text-[#1E293B]">
-                        {item.product_name}
-                      </TableCell>
-                      <TableCell className="text-center">{item.quantity}</TableCell>
-                      <TableCell className="text-right text-[#64748B]">
-                        {formatCurrency(item.unit_price)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(item.quantity * item.unit_price)}
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(item.product_id)}
-                          className="rounded-md p-1 text-[#64748B] hover:text-[#EF4444]"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-right font-semibold text-[#1E293B]">
-                      Total
-                    </TableCell>
-                    <TableCell className="text-right text-lg font-bold text-[#1E3A5F]">
-                      {formatCurrency(total)}
-                    </TableCell>
-                    <TableCell />
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
+            <OrderItemsSummary items={items} onRemoveItem={handleRemoveItem} />
           )}
         </CardContent>
       </Card>
