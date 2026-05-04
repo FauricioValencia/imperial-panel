@@ -16,82 +16,83 @@ import {
 } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/format";
 import { bogotaAddDaysYmd, bogotaTodayYmd } from "@/lib/date";
+import { ProductCombobox } from "./product-combobox";
 import type { ActionResponse, Product } from "@/types";
 
 const initialState: ActionResponse = { success: false };
 const RECENT_LOTS_COUNT = 5;
 
-interface StockEntryDialogProps {
+interface NewLotDialogProps {
   open: boolean;
   onClose: () => void;
-  product: Product | null;
+  onCreated?: () => void;
+  products: Product[];
 }
 
 function defaultExpirationDate(): string {
   return bogotaAddDaysYmd(bogotaTodayYmd(), 30);
 }
 
-export function StockEntryDialog({ open, onClose, product }: StockEntryDialogProps) {
+export function NewLotDialog({ open, onClose, onCreated, products }: NewLotDialogProps) {
   const [state, formAction, isPending] = useActionState(registerStockEntry, initialState);
   const prevSuccessRef = useRef(false);
   const lotNumberInputRef = useRef<HTMLInputElement>(null);
 
+  const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState<number>(0);
   const [unitCost, setUnitCost] = useState<number>(0);
   const [suggestedPrice, setSuggestedPrice] = useState<number>(0);
   const [noExpiration, setNoExpiration] = useState(false);
   const [recentLotNumbers, setRecentLotNumbers] = useState<string[]>([]);
 
+  const product = useMemo(
+    () => products.find((p) => p.id === productId) ?? null,
+    [products, productId]
+  );
+
   useEffect(() => {
     if (state.success && !prevSuccessRef.current) {
+      onCreated?.();
       onClose();
     }
     prevSuccessRef.current = state.success;
-  }, [state.success, onClose]);
+  }, [state.success, onClose, onCreated]);
 
-  // Foco al input de numero de lote cuando el error sugiere duplicado:
-  // permite al admin escribir uno manual sin clicks extra.
   useEffect(() => {
     if (state.error && /n[uú]mero/i.test(state.error) && lotNumberInputRef.current) {
       lotNumberInputRef.current.focus();
     }
   }, [state.error]);
 
-  // Reset al abrir el dialog: patron "reset state on prop change".
-  // Dialog de shadcn no desmonta el contenido cuando open cambia, asi que
-  // resetearmos manualmente. Linter de React 19 lo flagea pero es valido.
+  // Reset al abrir
   useEffect(() => {
     if (open) {
       prevSuccessRef.current = false;
       /* eslint-disable react-hooks/set-state-in-effect */
+      setProductId("");
       setQuantity(0);
       setUnitCost(0);
-      setSuggestedPrice(product?.price ?? 0);
+      setSuggestedPrice(0);
       setNoExpiration(false);
       setRecentLotNumbers([]);
       /* eslint-enable react-hooks/set-state-in-effect */
     }
-  }, [open, product]);
+  }, [open]);
 
-  // Cargar los ultimos numeros de lote del producto como referencia para
-  // el admin cuando quiera ingresar uno manual.
-  useEffect(() => {
-    if (!open || !product?.id) return;
-    let cancelled = false;
-    getRecentLotNumbers(product.id, RECENT_LOTS_COUNT).then((res) => {
-      if (cancelled) return;
-      if (res.success && res.data) {
-        setRecentLotNumbers(res.data);
-      }
+  function handleProductChange(newId: string) {
+    setProductId(newId);
+    const newProduct = products.find((p) => p.id === newId);
+    if (!newProduct) {
+      setSuggestedPrice(0);
+      setRecentLotNumbers([]);
+      return;
+    }
+    setSuggestedPrice(newProduct.price);
+    getRecentLotNumbers(newId, RECENT_LOTS_COUNT).then((res) => {
+      if (res.success && res.data) setRecentLotNumbers(res.data);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, product?.id]);
+  }
 
-  // Preview de margen: usa suggested_price del lote si fue ingresado;
-  // si no, cae al precio del producto. Asi el admin puede experimentar
-  // con un precio distinto sin tocar el catalogo.
   const margin = useMemo(() => {
     if (!product || unitCost <= 0) return null;
     const referencePrice = suggestedPrice > 0 ? suggestedPrice : product.price;
@@ -103,15 +104,13 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
 
   const totalInvestment = quantity > 0 && unitCost > 0 ? quantity * unitCost : 0;
 
-  if (!product) return null;
+  const submitDisabled = isPending || !product || quantity <= 0 || unitCost <= 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-[#1E293B]">
-            Crear lote — {product.name}
-          </DialogTitle>
+          <DialogTitle className="text-[#1E293B]">Nuevo lote</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           {state.error && (
@@ -120,22 +119,35 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
             </div>
           )}
 
-          <input type="hidden" name="product_id" value={product.id} />
+          <input type="hidden" name="product_id" value={productId} />
 
-          <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-sm text-[#64748B]">
-              Stock total actual:{" "}
-              <span className="font-semibold text-[#1E293B]">{product.stock}</span>{" "}
-              unidades · Disponible (vigente):{" "}
-              <span className="font-semibold text-[#10B981]">
-                {product.stock_available ?? product.stock}
-              </span>
-            </p>
-            <p className="text-xs text-[#64748B] mt-1">
-              Precio de venta:{" "}
-              <span className="font-medium">{formatCurrency(product.price)}</span>
-            </p>
+          <div className="space-y-2">
+            <Label htmlFor="product-id">Producto *</Label>
+            <ProductCombobox
+              id="product-id"
+              products={products}
+              value={productId}
+              onChange={handleProductChange}
+              disabled={isPending}
+            />
           </div>
+
+          {product && (
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-sm text-[#64748B]">
+                Stock total actual:{" "}
+                <span className="font-semibold text-[#1E293B]">{product.stock}</span>{" "}
+                unidades · Disponible (vigente):{" "}
+                <span className="font-semibold text-[#10B981]">
+                  {product.stock_available ?? product.stock}
+                </span>
+              </p>
+              <p className="text-xs text-[#64748B] mt-1">
+                Precio de venta:{" "}
+                <span className="font-medium">{formatCurrency(product.price)}</span>
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -149,7 +161,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
                 required
                 value={quantity || ""}
                 onChange={(e) => setQuantity(Math.max(0, Number(e.target.value) || 0))}
-                disabled={isPending}
+                disabled={isPending || !product}
               />
             </div>
             <div className="space-y-2">
@@ -160,7 +172,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
                 required
                 value={unitCost}
                 onValueChange={setUnitCost}
-                disabled={isPending}
+                disabled={isPending || !product}
                 placeholder="0"
               />
             </div>
@@ -178,8 +190,8 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
               name="suggested_price"
               value={suggestedPrice}
               onValueChange={setSuggestedPrice}
-              disabled={isPending}
-              placeholder={String(product.price)}
+              disabled={isPending || !product}
+              placeholder={product ? String(product.price) : "0"}
             />
           </div>
 
@@ -191,7 +203,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
                 name="expires_at"
                 type="date"
                 defaultValue={defaultExpirationDate()}
-                disabled={isPending || noExpiration}
+                disabled={isPending || noExpiration || !product}
                 required={!noExpiration}
               />
             </div>
@@ -201,7 +213,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
                 id="supplier"
                 name="supplier"
                 placeholder="Opcional"
-                disabled={isPending}
+                disabled={isPending || !product}
               />
             </div>
           </div>
@@ -212,7 +224,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
               name="no_expiration"
               checked={noExpiration}
               onCheckedChange={(c) => setNoExpiration(c === true)}
-              disabled={isPending}
+              disabled={isPending || !product}
             />
             <Label
               htmlFor="no_expiration"
@@ -223,13 +235,13 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="lot_number">Número de lote (opcional)</Label>
+            <Label htmlFor="lot_number">Numero de lote (opcional)</Label>
             <Input
               ref={lotNumberInputRef}
               id="lot_number"
               name="lot_number"
-              placeholder="Se genera automáticamente si lo dejas vacío"
-              disabled={isPending}
+              placeholder="Se genera automaticamente si lo dejas vacio"
+              disabled={isPending || !product}
               maxLength={50}
             />
             {recentLotNumbers.length > 0 && (
@@ -246,21 +258,19 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
               id="notes"
               name="notes"
               placeholder="Ej: Compra a proveedor X, factura 1234"
-              disabled={isPending}
+              disabled={isPending || !product}
               rows={2}
             />
           </div>
 
           {(totalInvestment > 0 || margin) && (() => {
-            // 3 zonas de margen: <0 perdida (rojo), 0-20% bajo (ambar),
-            // >=20% sano (verde). Coherente con badges de la tabla de lotes.
             const tone = !margin
               ? "neutral"
               : margin.pct < 0
-              ? "loss"
-              : margin.pct < 20
-              ? "low"
-              : "ok";
+                ? "loss"
+                : margin.pct < 20
+                  ? "low"
+                  : "ok";
             const wrapperClass = {
               neutral: "border-slate-200 bg-slate-50",
               loss: "border-red-200 bg-red-50",
@@ -277,7 +287,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
               <div className={`rounded-lg border p-3 space-y-1 ${wrapperClass}`}>
                 {totalInvestment > 0 && (
                   <p className="text-xs text-[#1E293B]">
-                    Inversión total: <strong>{formatCurrency(totalInvestment)}</strong>
+                    Inversion total: <strong>{formatCurrency(totalInvestment)}</strong>
                   </p>
                 )}
                 {margin && (
@@ -297,7 +307,9 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
                     </p>
                     <p className="text-[10px] text-[#64748B]">
                       Calculado sobre{" "}
-                      {margin.usingLotPrice ? "el precio sugerido del lote" : "el precio del producto"}{" "}
+                      {margin.usingLotPrice
+                        ? "el precio sugerido del lote"
+                        : "el precio del producto"}{" "}
                       ({formatCurrency(margin.referencePrice)})
                     </p>
                   </>
@@ -313,7 +325,7 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
             <Button
               type="submit"
               className="bg-[#10B981] hover:bg-[#059669]"
-              disabled={isPending}
+              disabled={submitDisabled}
             >
               {isPending ? "Creando lote..." : "Crear lote"}
             </Button>

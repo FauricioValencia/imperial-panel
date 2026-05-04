@@ -1,35 +1,43 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Package, Layers, Clock } from "lucide-react";
+import { Package, Layers, Clock, Users } from "lucide-react";
 import { ProductsTable } from "./products-table";
 import { LotsTable } from "./lots-table";
 import { ExpiringLots } from "./expiring-lots";
-import type { Customer, Product, ProductLot } from "@/types";
+import { CourierWarehousePanel } from "./courier-warehouse-panel";
+import type { Customer, ListLotsResult, Product, ProductLot } from "@/types";
+
+interface CourierSummaryRow {
+  courier_id: string;
+  courier_name: string;
+  total_units: number;
+  products_count: number;
+}
 
 interface InventoryTabsProps {
   products: Product[];
-  lots: ProductLot[];
+  initialLots: ListLotsResult;
+  expiringLots: ProductLot[];
   customers: Customer[];
+  initialCouriersInventory: CourierSummaryRow[];
 }
 
-type TabId = "products" | "lots" | "expiring";
+type TabId = "products" | "lots" | "expiring" | "couriers";
 
 function daysUntil(date: string | null): number {
   if (!date) return Infinity;
   return Math.floor((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-export function InventoryTabs({ products, lots, customers }: InventoryTabsProps) {
+export function InventoryTabs({
+  products,
+  initialLots,
+  expiringLots,
+  customers,
+  initialCouriersInventory,
+}: InventoryTabsProps) {
   const [tab, setTab] = useState<TabId>("products");
-
-  const expiringLots = useMemo(
-    () =>
-      lots.filter(
-        (l) => l.active && l.quantity_remaining > 0 && daysUntil(l.expires_at) < 30
-      ),
-    [lots]
-  );
 
   const criticalCount = useMemo(
     () => expiringLots.filter((l) => daysUntil(l.expires_at) < 7).length,
@@ -40,6 +48,7 @@ export function InventoryTabs({ products, lots, customers }: InventoryTabsProps)
     { id: "products", label: "Productos", icon: Package },
     { id: "lots", label: "Lotes", icon: Layers },
     { id: "expiring", label: "Por vencer", icon: Clock, badge: criticalCount || undefined },
+    { id: "couriers", label: "Couriers", icon: Users },
   ];
 
   return (
@@ -70,8 +79,14 @@ export function InventoryTabs({ products, lots, customers }: InventoryTabsProps)
       {tab === "products" && (
         <ProductsTable initialProducts={products} customers={customers} />
       )}
-      {tab === "lots" && <LotsTable lots={lots} />}
+      {tab === "lots" && <LotsTable initialResult={initialLots} products={products} />}
       {tab === "expiring" && <ExpiringLots lots={expiringLots} />}
+      {tab === "couriers" && (
+        <CourierWarehousePanel
+          initialCouriers={initialCouriersInventory}
+          products={products}
+        />
+      )}
     </div>
   );
 }

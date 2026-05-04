@@ -9,6 +9,7 @@ import {
   closeBatchSchema,
   updateBatchSchema,
   lotShrinkageSchema,
+  listLotsFiltersSchema,
   type ActionResponse,
   type Product,
   type ProductLot,
@@ -18,8 +19,11 @@ import {
   type CloseBatchInput,
   type UpdateBatchInput,
   type LotShrinkageInput,
+  type ListLotsFilters,
+  type ListLotsResult,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
+import { bogotaEndOfDayISO } from "@/lib/date";
 
 // Mapea errores Postgres/PostgREST a mensajes amigables al admin.
 // 23505 = unique violation. El indice product_lots_lot_number_admin_idx
@@ -144,7 +148,7 @@ export async function createProduct(
       p_admin_id: ctx.user.id,
       p_expires_at: result.data.initial_no_expiration
         ? null
-        : result.data.initial_expires_at ?? null,
+        : bogotaEndOfDayISO(result.data.initial_expires_at),
       p_no_expiration: result.data.initial_no_expiration ?? false,
       p_supplier: result.data.initial_supplier ?? null,
       p_notes: "Lote inicial al crear producto",
@@ -287,7 +291,9 @@ export async function registerStockEntry(
     p_unit_cost: result.data.unit_cost,
     p_admin_id: ctx.user.id,
     p_lot_number: result.data.lot_number ?? null,
-    p_expires_at: result.data.no_expiration ? null : result.data.expires_at ?? null,
+    p_expires_at: result.data.no_expiration
+      ? null
+      : bogotaEndOfDayISO(result.data.expires_at),
     p_no_expiration: result.data.no_expiration ?? false,
     p_supplier: result.data.supplier ?? null,
     p_notes: result.data.notes ?? null,
@@ -337,28 +343,123 @@ export async function listMovements(
   return { success: true, data: data as InventoryMovement[] };
 }
 
-export async function listLots(productId?: string): Promise<ActionResponse<ProductLot[]>> {
+export async function listLots(
+  filters?: Partial<ListLotsFilters>
+): Promise<ActionResponse<ListLotsResult>> {
   const ctx = await verifyAdmin();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
+  const parsed = listLotsFiltersSchema.safeParse(filters ?? {});
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+  const { product_id, status, search, supplier, sort_field, sort_dir, page, page_size } =
+    parsed.data;
+
   let query = ctx.supabase
     .from("product_lots")
-    .select("*, product:products(id, name, codigo, price)")
-    .eq("admin_id", ctx.user.id)
-    .order("received_at", { ascending: true });
+    .select("*, product:products(id, name, codigo, price)", { count: "exact" })
+    .eq("admin_id", ctx.user.id);
 
-  if (productId) {
-    query = query.eq("product_id", productId);
+  if (product_id) {
+    query = query.eq("product_id", product_id);
   }
 
-  const { data, error } = await query;
+  // Filtros por estado:
+  //   active   -> activo y con stock vigente (no vencido)
+  //   expiring -> activo, con stock, vence en 0..30 dias
+  //   expired  -> activo, con stock, ya vencido
+  //   depleted -> sin stock disponible (independiente de active)
+  //   all      -> sin filtro
+  const nowIso = new Date().toISOString();
+  if (status === "active") {
+    query = query
+      .eq("active", true)
+      .gt("quantity_remaining", 0)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
+  } else if (status === "expiring") {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + 30);
+    query = query
+      .eq("active", true)
+      .gt("quantity_remaining", 0)
+      .not("expires_at", "is", null)
+      .gt("expires_at", nowIso)
+      .lte("expires_at", cutoff.toISOString());
+  } else if (status === "expired") {
+    query = query
+      .eq("active", true)
+      .gt("quantity_remaining", 0)
+      .not("expires_at", "is", null)
+      .lt("expires_at", nowIso);
+  } else if (status === "depleted") {
+    query = query.eq("quantity_remaining", 0);
+  }
+
+  if (search && search.length > 0) {
+    // Acepta busqueda por numero de lote o nombre/codigo de proveedor.
+    // El nombre del producto se busca via filtro productId aparte.
+    query = query.or(`lot_number.ilike.%${search}%,supplier.ilike.%${search}%`);
+  }
+  if (supplier && supplier.length > 0) {
+    query = query.ilike("supplier", `%${supplier}%`);
+  }
+
+  const ascending = sort_dir === "asc";
+  // Tie-breaker por id para orden estable cuando hay valores iguales.
+  query = query.order(sort_field, { ascending, nullsFirst: false }).order("id", { ascending });
+
+  const from = (page - 1) * page_size;
+  const to = from + page_size - 1;
+  query = query.range(from, to);
+
+  const { data, error, count } = await query;
 
   if (error) {
-    logError("list_lots", error);
+    logError("list_lots", error, { filters: parsed.data });
     return { success: false, error: "Error fetching lots" };
   }
 
-  return { success: true, data: data as ProductLot[] };
+  const total = count ?? 0;
+  return {
+    success: true,
+    data: {
+      lots: (data ?? []) as ProductLot[],
+      total,
+      page,
+      page_size,
+      total_pages: total === 0 ? 0 : Math.ceil(total / page_size),
+    },
+  };
+}
+
+export async function getRecentLotNumbers(
+  productId: string,
+  limit = 5
+): Promise<ActionResponse<string[]>> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const safeLimit = Math.min(Math.max(1, Math.trunc(limit)), 20);
+
+  const { data, error } = await ctx.supabase
+    .from("product_lots")
+    .select("lot_number")
+    .eq("admin_id", ctx.user.id)
+    .eq("product_id", productId)
+    .order("received_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    logError("get_recent_lot_numbers", error, { product_id: productId });
+    return { success: false, error: "Error al cargar lotes recientes" };
+  }
+
+  return {
+    success: true,
+    data: (data ?? []).map((row) => row.lot_number as string),
+  };
 }
 
 export async function listExpiringLots(daysAhead = 30): Promise<ActionResponse<ProductLot[]>> {
@@ -560,7 +661,7 @@ export async function updateBatch(
     p_admin_id: ctx.user.id,
     p_supplier: supplier ?? null,
     p_notes: notes ?? null,
-    p_expires_at: expires_at ?? null,
+    p_expires_at: bogotaEndOfDayISO(expires_at),
     p_lot_number: lot_number ?? null,
     p_clear_expiration: clear_expiration ?? false,
     p_suggested_price: suggested_price ?? null,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bogotaTodayYmd } from "@/lib/date";
 
 // ============================================
 // Enums
@@ -16,7 +17,17 @@ export const ORDER_STATUS = [
 ] as const;
 export const PAYMENT_TYPE = ["full", "partial"] as const;
 export const PAYMENT_METHOD = ["cash", "transfer", "nequi", "daviplata"] as const;
-export const MOVEMENT_TYPE = ["inbound", "outbound", "return", "adjustment"] as const;
+export const MOVEMENT_TYPE = [
+  "inbound",
+  "outbound",
+  "return",
+  "adjustment",
+  "transfer_out",
+  "transfer_in",
+] as const;
+export const TRANSFER_KIND = ["dispatch", "return", "adjustment"] as const;
+export const TRANSFER_STATUS = ["pending", "completed", "cancelled"] as const;
+export const PENDING_ADJUSTMENT_STATUS = ["pending", "resolved", "cancelled"] as const;
 export const CHARGE_TYPE = [
   "legacy_debt",
   "adjustment",
@@ -90,9 +101,14 @@ export const stockEntryWithLotSchema = z
     path: ["expires_at"],
   })
   .refine(
-    (d) => d.no_expiration || !d.expires_at || new Date(d.expires_at).getTime() > Date.now(),
+    (d) => {
+      if (d.no_expiration || !d.expires_at) return true;
+      // Comparar dia calendario Bogota (string YYYY-MM-DD) para evitar
+      // que un lote que vence "hoy" sea rechazado por el desfase UTC.
+      return d.expires_at >= bogotaTodayYmd();
+    },
     {
-      message: "La fecha de vencimiento debe ser futura",
+      message: "La fecha de vencimiento no puede estar en el pasado",
       path: ["expires_at"],
     }
   );
@@ -164,6 +180,32 @@ export const lotShrinkageSchema = z
     message: "Se requiere cliente para salidas tipo muestra",
     path: ["customer_id"],
   });
+
+export const LOT_LIST_STATUS = [
+  "all",
+  "active",
+  "expiring",
+  "expired",
+  "depleted",
+] as const;
+export const LOT_SORT_FIELDS = [
+  "received_at",
+  "expires_at",
+  "quantity_remaining",
+  "unit_cost",
+] as const;
+export const LOT_SORT_DIRECTIONS = ["asc", "desc"] as const;
+
+export const listLotsFiltersSchema = z.object({
+  product_id: z.string().uuid().optional(),
+  status: z.enum(LOT_LIST_STATUS).default("active"),
+  search: z.string().trim().max(100).optional(),
+  supplier: z.string().trim().max(100).optional(),
+  sort_field: z.enum(LOT_SORT_FIELDS).default("received_at"),
+  sort_dir: z.enum(LOT_SORT_DIRECTIONS).default("desc"),
+  page: z.number().int().min(1).default(1),
+  page_size: z.number().int().min(1).max(100).default(25),
+});
 
 export const orderItemSchema = z.object({
   product_id: z.string().uuid(),
@@ -284,6 +326,57 @@ export const reportFiltersSchema = z.object({
   month: z.number().int().min(1).max(12).optional(),
 });
 
+// ============================================
+// Bodega del domiciliario (courier warehouse)
+// ============================================
+
+export const transferLineSchema = z.object({
+  product_id: z.string().uuid(),
+  quantity: z.number().int().positive("Cantidad debe ser mayor a cero"),
+});
+
+export const transferToCourierSchema = z.object({
+  courier_id: z.string().uuid(),
+  lines: z.array(transferLineSchema).min(1, "Debe transferir al menos un producto"),
+  notes: z.string().max(500).optional(),
+});
+
+export const returnLineSchema = z.object({
+  lot_id: z.string().uuid(),
+  product_id: z.string().uuid(),
+  quantity: z.number().int().positive(),
+});
+
+export const returnFromCourierSchema = z.object({
+  courier_id: z.string().uuid(),
+  lines: z.array(returnLineSchema).min(1, "Debe devolver al menos un producto"),
+  notes: z.string().max(500).optional(),
+});
+
+export const closeShiftSchema = z.object({
+  reported_total: z.number().min(0, "El total reportado no puede ser negativo"),
+  returns: z.array(returnLineSchema).default([]),
+  carryovers: z
+    .array(
+      z.object({
+        lot_id: z.string().uuid(),
+        product_id: z.string().uuid(),
+        quantity: z.number().int().min(0),
+      })
+    )
+    .default([]),
+  notes: z.string().max(500).optional(),
+});
+
+export const resolveAdjustmentSchema = z.object({
+  adjustment_id: z.string().uuid(),
+  resolution_note: z
+    .string()
+    .trim()
+    .min(5, "Indica una razon de al menos 5 caracteres")
+    .max(500),
+});
+
 export const businessConfigSchema = z.object({
   company_name: z.string().min(2),
   tax_id: z.string().optional(),
@@ -304,6 +397,18 @@ export type StockEntryWithLotInput = z.infer<typeof stockEntryWithLotSchema>;
 export type CloseBatchInput = z.infer<typeof closeBatchSchema>;
 export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
 export type LotShrinkageInput = z.infer<typeof lotShrinkageSchema>;
+export type ListLotsFilters = z.infer<typeof listLotsFiltersSchema>;
+export type LotListStatus = (typeof LOT_LIST_STATUS)[number];
+export type LotSortField = (typeof LOT_SORT_FIELDS)[number];
+export type LotSortDirection = (typeof LOT_SORT_DIRECTIONS)[number];
+
+export interface ListLotsResult {
+  lots: ProductLot[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
@@ -319,6 +424,12 @@ export type BusinessConfigInput = z.infer<typeof businessConfigSchema>;
 export type ZoneInput = z.infer<typeof zoneSchema>;
 export type RegisterOutboundInput = z.infer<typeof registerOutboundSchema>;
 export type ReportFilters = z.infer<typeof reportFiltersSchema>;
+export type TransferLineInput = z.infer<typeof transferLineSchema>;
+export type TransferToCourierInput = z.infer<typeof transferToCourierSchema>;
+export type ReturnLineInput = z.infer<typeof returnLineSchema>;
+export type ReturnFromCourierInput = z.infer<typeof returnFromCourierSchema>;
+export type CloseShiftInput = z.infer<typeof closeShiftSchema>;
+export type ResolveAdjustmentInput = z.infer<typeof resolveAdjustmentSchema>;
 
 // ============================================
 // Database types
@@ -330,6 +441,9 @@ export type PaymentType = (typeof PAYMENT_TYPE)[number];
 export type PaymentMethod = (typeof PAYMENT_METHOD)[number];
 export type MovementType = (typeof MOVEMENT_TYPE)[number];
 export type ChargeType = (typeof CHARGE_TYPE)[number];
+export type TransferKind = (typeof TRANSFER_KIND)[number];
+export type TransferStatus = (typeof TRANSFER_STATUS)[number];
+export type PendingAdjustmentStatus = (typeof PENDING_ADJUSTMENT_STATUS)[number];
 
 export interface User {
   id: string;
@@ -596,6 +710,101 @@ export interface SalesByMonthReport {
   total_orders: number;
   total_items: number;
   total_amount: number;
+}
+
+// ============================================
+// Bodega del domiciliario - DB types
+// ============================================
+
+export interface CourierInventoryRow {
+  id: string;
+  courier_id: string;
+  admin_id: string;
+  product_id: string;
+  lot_id: string;
+  quantity_remaining: number;
+  received_at: string;
+  updated_at: string;
+}
+
+export interface CourierInventorySummary {
+  courier_id: string;
+  admin_id: string;
+  product_id: string;
+  product_name: string;
+  product_code: string | null;
+  product_price: number;
+  total_units: number;
+  lots_count: number;
+  earliest_expiry: string | null;
+  has_expiring_soon: boolean;
+}
+
+export interface InventoryGlobalRow {
+  product_id: string;
+  admin_id: string;
+  name: string;
+  codigo: string | null;
+  price: number;
+  warehouse_total_physical: number;
+  warehouse_available: number;
+  in_couriers_available: number;
+  in_couriers_total: number;
+  available_global: number;
+}
+
+export interface StockTransfer {
+  id: string;
+  admin_id: string;
+  courier_id: string;
+  kind: TransferKind;
+  status: TransferStatus;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  courier?: User;
+  lines?: StockTransferLine[];
+}
+
+export interface StockTransferLine {
+  id: string;
+  transfer_id: string;
+  product_id: string;
+  lot_id: string;
+  quantity: number;
+  unit_cost_snapshot: number;
+  admin_id: string;
+  created_at: string;
+  product?: Product;
+  lot?: ProductLot;
+}
+
+export interface PendingAdjustment {
+  id: string;
+  courier_id: string;
+  admin_id: string;
+  order_item_id: string | null;
+  product_id: string;
+  quantity: number;
+  reason: string;
+  status: PendingAdjustmentStatus;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+  product?: Product;
+  courier?: User;
+}
+
+export interface CourierStockShortage {
+  product_id: string;
+  product_name: string;
+  required: number;
+  available: number;
+  shortfall: number;
 }
 
 // ============================================

@@ -81,16 +81,16 @@ export async function createOrder(
 
   const { customer_id, items, notes, allow_loss } = result.data;
 
-  // Validar stock vigente disponible antes de crear la orden.
-  // stock_available = suma de quantity_remaining de lotes vigentes
-  // (no vencidos, activos). Es la cifra que deduct_stock realmente
-  // puede consumir; products.stock incluye vencidos bloqueados.
+  // Validar stock GLOBAL (central + bodegas couriers) antes de crear orden.
+  // El producto puede estar en bodega central o ya transferido a algun
+  // courier; ambos cuentan como disponibilidad del tenant. La validacion
+  // de "el courier especifico tiene el stock" se hace al asignar.
   const productIds = Array.from(new Set(items.map((i) => i.product_id)));
   const { data: stockRows, error: stockFetchError } = await ctx.supabase
-    .from("products")
-    .select("id, name, stock_available")
+    .from("inventory_global")
+    .select("product_id, name, available_global")
     .eq("admin_id", ctx.user.id)
-    .in("id", productIds);
+    .in("product_id", productIds);
 
   if (stockFetchError) {
     logError("create_order_stock_check", stockFetchError);
@@ -98,10 +98,9 @@ export async function createOrder(
   }
 
   const stockMap = new Map(
-    (stockRows as { id: string; name: string; stock_available: number }[] | null)?.map((p) => [
-      p.id,
-      p,
-    ]) ?? []
+    (stockRows as { product_id: string; name: string; available_global: number }[] | null)?.map(
+      (p) => [p.product_id, { id: p.product_id, name: p.name, stock_available: Number(p.available_global) }]
+    ) ?? []
   );
 
   const requiredByProduct = new Map<string, number>();
@@ -120,7 +119,7 @@ export async function createOrder(
     if (product.stock_available < requiredQty) {
       return {
         success: false,
-        error: `Stock vigente insuficiente para ${product.name}: ${product.stock_available} disponible, ${requiredQty} solicitado`,
+        error: `Stock global insuficiente para ${product.name}: ${product.stock_available} disponible (entre central y couriers), ${requiredQty} solicitado`,
       };
     }
   }
@@ -187,13 +186,11 @@ export async function createOrder(
       lot.quantity_remaining -= consume;
     }
     if (remaining > 0) {
-      // No deberia pasar (validacion previa de stock_available), pero
-      // por seguridad: si no alcanzan los lotes vigentes, abortamos.
-      const product = stockMap.get(item.product_id);
-      return {
-        success: false,
-        error: `Stock vigente insuficiente para ${product?.name ?? item.product_id}`,
-      };
+      // El stock global ya paso validacion (central + couriers); que el
+      // central no alcance no es error: parte del producto puede estar
+      // en bodega de algun courier. En ese caso no podemos proyectar el
+      // costo FIFO completo y omitimos el chequeo de margen para este item.
+      continue;
     }
     const projectedAvgCost = totalCost / item.quantity;
     if (item.unit_price < projectedAvgCost) {
@@ -274,7 +271,7 @@ export async function createOrder(
 export async function assignCourier(
   orderId: string,
   courierId: string
-): Promise<ActionResponse> {
+): Promise<ActionResponse<{ shortages?: { product_id: string; product_name: string; required: number; available: number; shortfall: number }[] }>> {
   const ctx = await verifyAdmin();
   if (!ctx) return { success: false, error: "Unauthorized" };
 
@@ -286,10 +283,10 @@ export async function assignCourier(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  // Verify order exists and is pending
+  // Verify order exists and is pending; obtener items para validar bodega courier
   const { data: order } = await ctx.supabase
     .from("orders")
-    .select("id, status")
+    .select("id, status, items:order_items(product_id, quantity)")
     .eq("id", orderId)
     .single();
 
@@ -298,7 +295,50 @@ export async function assignCourier(
     return { success: false, error: "Order must be pending to assign a courier" };
   }
 
-  // Update order (stock is deducted on delivery confirmation, not here)
+  // Agregar items por producto (puede haber duplicados)
+  const itemsByProduct = new Map<string, number>();
+  for (const it of (order.items as { product_id: string; quantity: number }[]) ?? []) {
+    itemsByProduct.set(
+      it.product_id,
+      (itemsByProduct.get(it.product_id) ?? 0) + it.quantity
+    );
+  }
+  const validationItems = Array.from(itemsByProduct.entries()).map(([product_id, quantity]) => ({
+    product_id,
+    quantity,
+  }));
+
+  // Validar que el courier tenga stock suficiente en su bodega
+  const { data: shortages, error: validationError } = await ctx.supabase.rpc(
+    "validate_courier_has_stock",
+    { p_courier_id: courierId, p_items: validationItems }
+  );
+
+  if (validationError) {
+    logError("validate_courier_stock", validationError, { order_id: orderId, courier_id: courierId });
+    return { success: false, error: "Error validando bodega del courier" };
+  }
+
+  type Shortage = {
+    product_id: string;
+    product_name: string;
+    required: number;
+    available: number;
+    shortfall: number;
+  };
+  const shortageList = (shortages ?? []) as Shortage[];
+
+  if (shortageList.length > 0) {
+    const first = shortageList[0];
+    const extra = shortageList.length > 1 ? ` (y ${shortageList.length - 1} mas)` : "";
+    return {
+      success: false,
+      error: `El courier no tiene stock suficiente: ${first.product_name} (faltan ${first.shortfall})${extra}. Transfiere stock primero.`,
+      data: { shortages: shortageList },
+    };
+  }
+
+  // Update order (stock is deducted on delivery confirmation from courier inventory)
   const { error } = await ctx.supabase
     .from("orders")
     .update({
@@ -396,9 +436,13 @@ export async function markInTransit(orderId: string): Promise<ActionResponse> {
 }
 
 // Courier: confirm delivery with optional returns
+// `attemptKey` provee idempotency: dos llamadas con el mismo key sobre la
+// misma orden son atendidas una sola vez (el UNIQUE en delivery_attempts
+// hace que el segundo INSERT falle y retornemos exito sin re-procesar).
 export async function confirmDelivery(
   orderId: string,
-  returnedItems?: { order_item_id: string; returned_quantity: number }[]
+  returnedItems?: { order_item_id: string; returned_quantity: number }[],
+  attemptKey?: string
 ): Promise<ActionResponse> {
   const ctx = await verifyAuth();
   if (!ctx || ctx.user.role !== "courier") {
@@ -411,6 +455,35 @@ export async function confirmDelivery(
   });
   if (!validation.success) {
     return { success: false, error: validation.error.issues[0].message };
+  }
+
+  if (!ctx.user.admin_id) {
+    logError("confirm_delivery_no_admin", new Error("Courier missing admin_id"), { order_id: orderId });
+    return { success: false, error: "El courier no esta vinculado a un admin" };
+  }
+  const courierAdminId = ctx.user.admin_id;
+
+  // Idempotency: si attemptKey fue provisto, intentamos registrarlo. UNIQUE
+  // sobre (order_id, attempt_key) garantiza que un reintento del mismo
+  // request retorne exito sin re-procesar.
+  if (attemptKey) {
+    const { error: attemptError } = await ctx.supabase
+      .from("delivery_attempts")
+      .insert({
+        order_id: orderId,
+        attempt_key: attemptKey,
+        courier_id: ctx.user.id,
+        admin_id: courierAdminId,
+      });
+    if (attemptError) {
+      // 23505 = unique violation -> ya se proceso este intento
+      if (attemptError.code === "23505") {
+        logOperacion("delivery_idempotent_replay", { order_id: orderId, attempt_key: attemptKey }, ctx.user.id);
+        return { success: true };
+      }
+      logError("delivery_attempt_register", attemptError, { order_id: orderId });
+      return { success: false, error: "Error registrando intento de entrega" };
+    }
   }
 
   // Get order items
@@ -464,17 +537,10 @@ export async function confirmDelivery(
     }
   }
 
-  // Determine the admin_id this courier belongs to (required by deduct_stock)
-  const courierAdminId = ctx.user.admin_id;
-  if (!courierAdminId) {
-    logError("confirm_delivery_no_admin", new Error("Courier missing admin_id"), { order_id: orderId });
-    return { success: false, error: "El courier no esta vinculado a un admin" };
-  }
-
-  // Deduct stock only for delivered quantities (total - returned).
-  // The new deduct_stock signature uses FIFO multi-lot and records
-  // outbound_lot_allocations per order_item; rollback uses
-  // return_stock_by_item which reverts to the exact origin lot.
+  // Descontar stock SOLO de la bodega del courier (no central).
+  // deduct_courier_stock usa FIFO sobre courier_inventory y registra
+  // outbound_lot_allocations apuntando al lote original (preserva COGS).
+  // Rollback con return_courier_stock_by_item devuelve a courier_inventory.
   let allReturned = true;
   const deductedItems: { order_item_id: string; quantity: number }[] = [];
   // Allocations consumidas por lote (para audit log). Cada entrada captura
@@ -495,28 +561,30 @@ export async function confirmDelivery(
     if (deliveredQty > 0) {
       allReturned = false;
 
-      const { data: allocations, error: stockError } = await ctx.supabase.rpc("deduct_stock", {
+      const { data: allocations, error: stockError } = await ctx.supabase.rpc("deduct_courier_stock", {
+        p_courier_id: ctx.user.id,
+        p_admin_id: courierAdminId,
         p_product_id: item.product_id,
         p_quantity: deliveredQty,
-        p_admin_id: courierAdminId,
         p_order_item_id: item.id,
         p_order_reference: orderId,
         p_notes: null,
       });
 
       if (stockError) {
-        // Rollback previously deducted items via allocations (LIFO)
+        // Rollback de items previos LIFO sobre courier_inventory
         for (const deducted of deductedItems) {
-          await ctx.supabase.rpc("return_stock_by_item", {
+          await ctx.supabase.rpc("return_courier_stock_by_item", {
             p_order_item_id: deducted.order_item_id,
             p_quantity: deducted.quantity,
             p_admin_id: courierAdminId,
+            p_courier_id: ctx.user.id,
           });
         }
         logError("confirm_delivery_stock", stockError, { order_id: orderId });
         return {
           success: false,
-          error: stockError.message ?? "Error al descontar stock",
+          error: stockError.message ?? "Stock insuficiente en tu bodega",
         };
       }
 
@@ -550,6 +618,25 @@ export async function confirmDelivery(
       if (itemUpdateError) {
         logError("confirm_delivery_update_item", itemUpdateError, { order_id: orderId });
         return { success: false, error: "Error al actualizar items" };
+      }
+
+      // Movement de devolucion del cliente. Las unidades devueltas siguen
+      // fisicamente con el courier (no se descontaron de su bodega), pero
+      // queda el rastro en el historial para reconciliacion al cierre de turno.
+      const { error: returnMoveError } = await ctx.supabase
+        .from("inventory_movements")
+        .insert({
+          product_id: item.product_id,
+          type: "return",
+          quantity: returnedQty,
+          order_reference: orderId,
+          order_item_id: item.id,
+          admin_id: courierAdminId,
+          courier_id: ctx.user.id,
+          notes: "Devolucion del cliente",
+        });
+      if (returnMoveError) {
+        logError("confirm_delivery_return_movement", returnMoveError, { order_id: orderId });
       }
     }
   }

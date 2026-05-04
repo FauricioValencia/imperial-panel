@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Warehouse } from "lucide-react";
 import { signOut } from "@/actions/auth";
 import type { User } from "@/types";
 
@@ -10,11 +11,13 @@ const titles: Record<string, string> = {
   "/route": "Mi Ruta",
   "/history": "Historial",
   "/profile": "Mi Perfil",
+  "/warehouse": "Mi Bodega",
 };
 
 export function CourierHeader({ user }: { user: User }) {
   const pathname = usePathname();
   const title = titles[pathname] || "Imperial";
+  const showWarehouseShortcut = pathname !== "/warehouse";
 
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200 bg-[#1E3A5F] px-4">
@@ -25,6 +28,15 @@ export function CourierHeader({ user }: { user: User }) {
         <h1 className="text-base font-semibold text-white">{title}</h1>
       </div>
       <div className="flex items-center gap-3">
+        {showWarehouseShortcut && (
+          <Link
+            href="/warehouse"
+            className="rounded-md p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
+            aria-label="Mi bodega"
+          >
+            <Warehouse className="h-4 w-4" />
+          </Link>
+        )}
         <span className="text-xs text-white/70">{user.name}</span>
         <form action={signOut}>
           <button
