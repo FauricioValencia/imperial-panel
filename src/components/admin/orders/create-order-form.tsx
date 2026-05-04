@@ -138,8 +138,10 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
     });
   }
 
+  const selectedProductRow = products.find((p) => p.id === selectedProduct);
+
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
@@ -215,15 +217,15 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="text-base text-[#1E293B]">Productos</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-3">
-            <div className="flex-1">
+        <CardContent className="min-w-0 space-y-4">
+          <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-end">
+            <div className="min-w-0 w-full overflow-hidden md:min-h-0 md:flex-1">
               <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 w-full min-w-0 max-w-full gap-2 overflow-hidden py-0 **:data-[slot=select-value]:block! **:data-[slot=select-value]:min-w-0 **:data-[slot=select-value]:flex-1 **:data-[slot=select-value]:overflow-hidden! **:data-[slot=select-value]:truncate **:data-[slot=select-value]:text-left **:data-[slot=select-value]:line-clamp-none!">
                   <SelectValue placeholder="Seleccionar producto..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -235,28 +237,33 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-24">
-              <Input
-                type="number"
-                min={1}
-                max={products.find((p) => p.id === selectedProduct)?.stock_available || 999}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                placeholder="Cant."
-              />
+            <div className="flex shrink-0 items-end gap-2 md:gap-3">
+              <div className="w-20 md:w-24">
+                <Input
+                  type="number"
+                  min={1}
+                  max={selectedProductRow?.stock_available || 999}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  placeholder="Cant."
+                  className="min-w-0"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={handleAddItem}
+                disabled={!selectedProduct || quantity <= 0}
+                className="shrink-0 bg-[#3B82F6] hover:bg-[#2563EB]"
+                size="icon"
+                aria-label="Agregar producto"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              type="button"
-              onClick={handleAddItem}
-              disabled={!selectedProduct || quantity <= 0}
-              className="bg-[#3B82F6] hover:bg-[#2563EB]"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
           </div>
 
           {items.length > 0 && (
-            <div className="rounded-lg border border-slate-200">
+            <div className="-mx-1 overflow-x-auto rounded-lg border border-slate-200 sm:mx-0">
               <Table>
                 <TableHeader>
                   <TableRow>

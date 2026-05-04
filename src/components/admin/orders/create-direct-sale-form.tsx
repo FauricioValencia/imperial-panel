@@ -228,10 +228,10 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
           <CardTitle className="text-base text-[#1E293B]">Productos (bodega central)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="min-w-0 w-full sm:flex-1">
+          <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-end">
+            <div className="min-w-0 w-full overflow-hidden md:min-h-0 md:flex-1">
               <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                <SelectTrigger className="h-auto min-h-9 w-full min-w-0 py-2 whitespace-normal **:data-[slot=select-value]:text-left">
+                <SelectTrigger className="h-9 w-full min-w-0 max-w-full gap-2 overflow-hidden py-0 **:data-[slot=select-value]:block! **:data-[slot=select-value]:min-w-0 **:data-[slot=select-value]:flex-1 **:data-[slot=select-value]:overflow-hidden! **:data-[slot=select-value]:truncate **:data-[slot=select-value]:text-left **:data-[slot=select-value]:line-clamp-none!">
                   <SelectValue placeholder="Seleccionar producto..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -243,8 +243,8 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex shrink-0 items-end gap-2 sm:gap-3">
-              <div className="w-20 sm:w-24">
+            <div className="flex shrink-0 items-end gap-2 md:gap-3">
+              <div className="w-20 md:w-24">
                 <Input
                   type="number"
                   min={1}
