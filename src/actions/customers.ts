@@ -29,6 +29,25 @@ export async function listCustomers(search?: string): Promise<ActionResponse<Cus
   return { success: true, data: data as Customer[] };
 }
 
+export async function getCustomer(customerId: string): Promise<ActionResponse<Customer>> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const { data, error } = await ctx.supabase
+    .from("customers")
+    .select("*")
+    .eq("id", customerId)
+    .eq("admin_id", ctx.user.id)
+    .single();
+
+  if (error || !data) {
+    logError("get_customer", error, { customer_id: customerId });
+    return { success: false, error: "Cliente no encontrado" };
+  }
+
+  return { success: true, data: data as Customer };
+}
+
 export async function createCustomer(
   _prevState: ActionResponse,
   formData: FormData

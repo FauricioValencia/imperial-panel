@@ -158,6 +158,22 @@ erDiagram
 | activo | BOOLEAN | NO | true | Soft delete |
 | created_at | TIMESTAMPTZ | NO | now() | |
 
+### customer_prices (precios acordados por cliente)
+| Campo | Tipo | Nullable | Default | Notas |
+|-------|------|----------|---------|-------|
+| id | UUID | NO | gen_random_uuid() | PK |
+| customer_id | UUID | NO | — | FK `customers`, mismo tenant que `admin_id` |
+| product_id | UUID | NO | — | FK `products`, mismo tenant |
+| admin_id | UUID | NO | — | Igual al `admin_id` del cliente (forzado por trigger) |
+| custom_price | NUMERIC(12,2) | NO | — | Precio de venta acordado; CHECK \> 0 |
+| active | BOOLEAN | NO | true | Soft off: vuelve al precio de lista en nuevos pedidos |
+| notes | TEXT | SI | — | |
+| created_at | TIMESTAMPTZ | NO | now() | |
+| updated_at | TIMESTAMPTZ | NO | now() | |
+| UNIQUE | (admin_id, customer_id, product_id) | — | — | Un acuerdo por par cliente-producto por tenant |
+
+El precio efectivo al armar un pedido es `custom_price` si hay fila activa; si no, `products.price`. El snapshot comercial queda en `order_items.unit_price`.
+
 ### productos
 | Campo | Tipo | Nullable | Default | Notas |
 |-------|------|----------|---------|-------|

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { OrderItemsSummary } from "@/components/admin/orders/order-items-summary";
+import { getCustomerResolvedUnitPrices } from "@/actions/customer-prices";
 import { createOrder } from "@/actions/orders";
 import { formatCurrency } from "@/lib/format";
 import type { Customer, Product } from "@/types";
@@ -45,8 +48,43 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [resolvedPrices, setResolvedPrices] = useState<Record<string, number>>({});
+  const [allowPriceOverride, setAllowPriceOverride] = useState(false);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
+
+  useEffect(() => {
+    if (!customerId) {
+      setResolvedPrices({});
+      return;
+    }
+    setResolvedPrices({});
+    let cancelled = false;
+    void getCustomerResolvedUnitPrices(
+      customerId,
+      products.map((p) => p.id)
+    ).then((res) => {
+      if (cancelled || !res.success || !res.data) return;
+      setResolvedPrices(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, products]);
+
+  useEffect(() => {
+    if (!customerId || Object.keys(resolvedPrices).length === 0) return;
+    setItems((prev) =>
+      prev.map((i) => ({
+        ...i,
+        unit_price:
+          resolvedPrices[i.product_id] ??
+          products.find((p) => p.id === i.product_id)?.price ??
+          i.unit_price,
+      }))
+    );
+  }, [customerId, resolvedPrices, products]);
+
   const filteredCustomers = customers.filter((c) => {
     const term = customerSearch.toLowerCase();
     if (!term) return true;
@@ -67,6 +105,14 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
   function handleClearCustomer() {
     setCustomerId("");
     setCustomerSearch("");
+    setResolvedPrices({});
+    setAllowPriceOverride(false);
+    setItems((prev) =>
+      prev.map((i) => ({
+        ...i,
+        unit_price: products.find((p) => p.id === i.product_id)?.price ?? i.unit_price,
+      }))
+    );
   }
 
   const availableProducts = products.filter(
@@ -80,13 +126,15 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
     const qty = Math.min(quantity, product.stock_available);
     if (qty <= 0) return;
 
+    const unit =
+      resolvedPrices[product.id] !== undefined ? resolvedPrices[product.id] : product.price;
     setItems([
       ...items,
       {
         product_id: product.id,
         product_name: product.name,
         quantity: qty,
-        unit_price: product.price,
+        unit_price: unit,
         max_stock: product.stock_available,
       },
     ]);
@@ -119,6 +167,7 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
           unit_price: i.unit_price,
         })),
         notes: notes || undefined,
+        allow_price_override: allowPriceOverride || undefined,
       });
 
       if (!result.success) {
@@ -256,6 +305,27 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
           {items.length > 0 && (
             <OrderItemsSummary items={items} onRemoveItem={handleRemoveItem} />
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base text-[#1E293B]">Precio manual</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-row items-start gap-3 space-y-0">
+          <Checkbox
+            id="allow-price-override-order"
+            checked={allowPriceOverride}
+            onCheckedChange={(v) => setAllowPriceOverride(v === true)}
+          />
+          <div className="space-y-1">
+            <Label htmlFor="allow-price-override-order" className="cursor-pointer font-normal">
+              Permitir precio distinto al de lista o acuerdo con el cliente
+            </Label>
+            <p className="text-xs text-[#64748B]">
+              Marca esta opcion solo si ajustaste manualmente el precio de una linea y el sistema lo rechaza.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderItemsSummary } from "@/components/admin/orders/order-items-summary";
+import { getCustomerResolvedUnitPrices } from "@/actions/customer-prices";
 import { createDirectSale } from "@/actions/direct-sale";
 import { formatCurrency } from "@/lib/format";
 import type { Customer, DirectSaleProductOption, PaymentMethod } from "@/types";
@@ -49,8 +50,39 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
   const [pagoInmediato, setPagoInmediato] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [allowLoss, setAllowLoss] = useState(false);
+  const [resolvedPrices, setResolvedPrices] = useState<Record<string, number>>({});
+  const [allowPriceOverride, setAllowPriceOverride] = useState(false);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
+
+  useEffect(() => {
+    if (!customerId) {
+      setResolvedPrices({});
+      return;
+    }
+    setResolvedPrices({});
+    let cancelled = false;
+    void getCustomerResolvedUnitPrices(customerId, products.map((p) => p.id)).then((res) => {
+      if (cancelled || !res.success || !res.data) return;
+      setResolvedPrices(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, products]);
+
+  useEffect(() => {
+    if (!customerId || Object.keys(resolvedPrices).length === 0) return;
+    setItems((prev) =>
+      prev.map((i) => ({
+        ...i,
+        unit_price:
+          resolvedPrices[i.product_id] ??
+          products.find((p) => p.id === i.product_id)?.price ??
+          i.unit_price,
+      }))
+    );
+  }, [customerId, resolvedPrices, products]);
   const filteredCustomers = customers.filter((c) => {
     const term = customerSearch.toLowerCase();
     if (!term) return true;
@@ -71,6 +103,14 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
   function handleClearCustomer() {
     setCustomerId("");
     setCustomerSearch("");
+    setResolvedPrices({});
+    setAllowPriceOverride(false);
+    setItems((prev) =>
+      prev.map((i) => ({
+        ...i,
+        unit_price: products.find((p) => p.id === i.product_id)?.price ?? i.unit_price,
+      }))
+    );
   }
 
   const availableProducts = products.filter(
@@ -84,13 +124,15 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
     const qty = Math.min(quantity, product.warehouse_available);
     if (qty <= 0) return;
 
+    const unit =
+      resolvedPrices[product.id] !== undefined ? resolvedPrices[product.id] : product.price;
     setItems([
       ...items,
       {
         product_id: product.id,
         product_name: product.name,
         quantity: qty,
-        unit_price: product.price,
+        unit_price: unit,
       },
     ]);
     setSelectedProduct("");
@@ -124,6 +166,7 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
         notes: notes || undefined,
         allow_loss: allowLoss || undefined,
         payment_method: pagoInmediato ? paymentMethod : undefined,
+        allow_price_override: allowPriceOverride || undefined,
       });
 
       if (!result.success) {
@@ -332,6 +375,20 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
         />
         <Label htmlFor="allow-loss" className="cursor-pointer text-sm font-normal text-[#1E293B]">
           Permitir venta con pérdida (precio bajo costo FIFO proyectado)
+        </Label>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
+        <Checkbox
+          id="allow-price-override-direct"
+          checked={allowPriceOverride}
+          onCheckedChange={(c) => setAllowPriceOverride(c === true)}
+        />
+        <Label
+          htmlFor="allow-price-override-direct"
+          className="cursor-pointer text-sm font-normal text-[#1E293B]"
+        >
+          Permitir precio distinto al de lista o acuerdo con el cliente
         </Label>
       </div>
 

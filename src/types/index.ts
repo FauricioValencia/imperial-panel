@@ -221,6 +221,8 @@ export const createOrderSchema = z.object({
   // Override del check de margen: si true, permite vender por debajo del
   // costo proyectado FIFO. Se loguea con auditoria.
   allow_loss: z.boolean().optional(),
+  /** Si true, permite unit_price distinto al precio de lista o acuerdo cliente. */
+  allow_price_override: z.boolean().optional(),
 });
 
 /** Venta en mostrador: stock central, sin courier. Sin payment_method = a crédito. */
@@ -230,6 +232,17 @@ export const createDirectSaleSchema = z.object({
   notes: z.string().optional(),
   allow_loss: z.boolean().optional(),
   payment_method: z.enum(PAYMENT_METHOD).optional(),
+  allow_price_override: z.boolean().optional(),
+});
+
+export const upsertCustomerPriceSchema = z.object({
+  customer_id: z.string().uuid(),
+  product_id: z.string().uuid(),
+  custom_price: z
+    .number()
+    .positive("El precio debe ser mayor a cero")
+    .max(50_000_000, "Precio demasiado alto"),
+  notes: z.string().max(500).optional(),
 });
 
 export const assignCourierSchema = z.object({
@@ -421,6 +434,7 @@ export interface ListLotsResult {
 }
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CreateDirectSaleInput = z.infer<typeof createDirectSaleSchema>;
+export type UpsertCustomerPriceInput = z.infer<typeof upsertCustomerPriceSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
 export type AddManualChargeInput = z.infer<typeof addManualChargeSchema>;
@@ -499,6 +513,20 @@ export interface Product {
   admin_id: string;
   active: boolean;
   created_at: string;
+}
+
+/** Precio acordado cliente + producto (tabla customer_prices). */
+export interface CustomerPrice {
+  id: string;
+  customer_id: string;
+  product_id: string;
+  admin_id: string;
+  custom_price: number;
+  active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  product?: Pick<Product, "id" | "name" | "price">;
 }
 
 export interface ProductLot {

@@ -9,6 +9,10 @@ import {
   type DirectSaleProductOption,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
+import {
+  cargarPreciosResueltosPorProducto,
+  validarItemsContraPreciosResueltos,
+} from "@/lib/customer-pricing";
 
 /** Productos con stock vendible solo en bodega central (para UI venta directa). */
 export async function listProductsForDirectSale(): Promise<
@@ -64,7 +68,8 @@ export async function createDirectSale(
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const { customer_id, items, notes, allow_loss, payment_method } = parsed.data;
+  const { customer_id, items, notes, allow_loss, payment_method, allow_price_override } =
+    parsed.data;
   const adminId = ctx.user.id;
 
   const { data: customer, error: custErr } = await ctx.supabase
@@ -136,6 +141,45 @@ export async function createDirectSale(
         error: `Stock insuficiente en bodega central para ${nm}: ${avail} disponible, ${requiredQty} solicitado`,
       };
     }
+  }
+
+  let resolvedPrices: Map<string, number>;
+  try {
+    resolvedPrices = await cargarPreciosResueltosPorProducto(ctx.supabase, {
+      adminId: adminId,
+      customerId: customer_id,
+      productIds: [...productIds],
+    });
+  } catch (e) {
+    logError("direct_sale_price_resolve", e, { customer_id });
+    return { success: false, error: "Error validando precios de la venta" };
+  }
+
+  for (const item of items) {
+    if (!resolvedPrices.has(item.product_id)) {
+      const nm = nameById.get(item.product_id) ?? "Producto";
+      return {
+        success: false,
+        error: `${nm}: no tiene precio de catalogo valido para este negocio`,
+      };
+    }
+  }
+
+  const priceValidation = validarItemsContraPreciosResueltos(items, resolvedPrices);
+  if (!priceValidation.ok) {
+    if (!allow_price_override) {
+      const first = priceValidation.desajustes[0];
+      const nm = nameById.get(first.product_id) ?? "Producto";
+      return {
+        success: false,
+        error: `${nm}: precio ${first.enviado} no coincide con el esperado ${Number.isFinite(first.esperado) ? first.esperado.toFixed(2) : "?"} (lista o acuerdo). Marque "Permitir precio distinto al sugerido" si es intencional.`,
+      };
+    }
+    logOperacion(
+      "direct_sale_with_price_override",
+      { customer_id, desajustes: priceValidation.desajustes },
+      adminId
+    );
   }
 
   const lotsByProduct = new Map<string, { unit_cost: number; quantity_remaining: number }[]>();

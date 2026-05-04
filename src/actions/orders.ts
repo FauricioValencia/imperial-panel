@@ -12,6 +12,10 @@ import {
   type User,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
+import {
+  cargarPreciosResueltosPorProducto,
+  validarItemsContraPreciosResueltos,
+} from "@/lib/customer-pricing";
 
 export async function listOrders(
   statusFilter?: string
@@ -79,7 +83,20 @@ export async function createOrder(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  const { customer_id, items, notes, allow_loss } = result.data;
+  const { customer_id, items, notes, allow_loss, allow_price_override } = result.data;
+
+  const { data: custRow, error: custErr } = await ctx.supabase
+    .from("customers")
+    .select("id, active, admin_id")
+    .eq("id", customer_id)
+    .single();
+
+  if (custErr || !custRow || custRow.admin_id !== ctx.user.id) {
+    return { success: false, error: "Cliente no encontrado" };
+  }
+  if (!custRow.active) {
+    return { success: false, error: "Cliente inactivo" };
+  }
 
   // Validar stock GLOBAL (central + bodegas couriers) antes de crear orden.
   // El producto puede estar en bodega central o ya transferido a algun
@@ -122,6 +139,45 @@ export async function createOrder(
         error: `Stock global insuficiente para ${product.name}: ${product.stock_available} disponible (entre central y couriers), ${requiredQty} solicitado`,
       };
     }
+  }
+
+  let resolvedPrices: Map<string, number>;
+  try {
+    resolvedPrices = await cargarPreciosResueltosPorProducto(ctx.supabase, {
+      adminId: ctx.user.id,
+      customerId: customer_id,
+      productIds: [...productIds],
+    });
+  } catch (e) {
+    logError("create_order_price_resolve", e, { customer_id });
+    return { success: false, error: "Error validando precios del pedido" };
+  }
+
+  for (const item of items) {
+    if (!resolvedPrices.has(item.product_id)) {
+      const nm = stockMap.get(item.product_id)?.name ?? "Producto";
+      return {
+        success: false,
+        error: `${nm}: no tiene precio de catalogo valido para este negocio`,
+      };
+    }
+  }
+
+  const priceValidation = validarItemsContraPreciosResueltos(items, resolvedPrices);
+  if (!priceValidation.ok) {
+    if (!allow_price_override) {
+      const first = priceValidation.desajustes[0];
+      const nm = stockMap.get(first.product_id)?.name ?? "Producto";
+      return {
+        success: false,
+        error: `${nm}: precio ${first.enviado} no coincide con el esperado ${Number.isFinite(first.esperado) ? first.esperado.toFixed(2) : "?"} (lista o acuerdo). Marque "Permitir precio distinto al sugerido" si es intencional.`,
+      };
+    }
+    logOperacion(
+      "order_created_with_price_override",
+      { customer_id, desajustes: priceValidation.desajustes },
+      ctx.user.id
+    );
   }
 
   // Validar margen proyectado FIFO contra unit_price.

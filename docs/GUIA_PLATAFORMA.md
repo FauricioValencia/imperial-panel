@@ -54,6 +54,7 @@ El stock se maneja con funciones atomicas en PostgreSQL para evitar problemas de
 ### Pedidos (`/orders`)
 - Tabla de todos los pedidos con filtro por estado.
 - **Crear pedido** (`/orders/new`): seleccionar cliente, agregar productos con cantidad, notas opcionales.
+- **Venta directa** (`/orders/direct`): venta en mostrador sin domiciliario; descuenta stock de bodega central; el pedido queda entregado de inmediato; pago al contado o a crédito (cartera).
 - **Detalle de pedido** (`/orders/[id]`): informacion completa, items, estado, acciones disponibles.
 
 #### Flujo de un pedido:

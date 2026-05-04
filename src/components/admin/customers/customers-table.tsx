@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Pencil, Trash2, Plus, Search } from "lucide-react";
+import { Pencil, Tag, Trash2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -159,6 +160,13 @@ export function CustomersTable({
               </dl>
 
               <div className="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2">
+                <Link
+                  href={`/customers/${customer.id}`}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#1E3A5F] hover:bg-slate-100"
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  Precios
+                </Link>
                 <button
                   onClick={() => handleEdit(customer)}
                   className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#3B82F6] hover:bg-blue-50"
@@ -231,6 +239,13 @@ export function CustomersTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Link
+                        href={`/customers/${customer.id}`}
+                        className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#1E3A5F]"
+                        title="Precios acordados"
+                      >
+                        <Tag className="h-4 w-4" />
+                      </Link>
                       <button
                         onClick={() => handleEdit(customer)}
                         className="rounded-md p-1.5 text-[#64748B] hover:bg-slate-100 hover:text-[#3B82F6]"
