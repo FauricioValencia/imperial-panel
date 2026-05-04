@@ -8,6 +8,7 @@ import {
   stockEntryWithLotSchema,
   closeBatchSchema,
   updateBatchSchema,
+  lotShrinkageSchema,
   type ActionResponse,
   type Product,
   type ProductLot,
@@ -16,6 +17,7 @@ import {
   type BatchAllocationTrace,
   type CloseBatchInput,
   type UpdateBatchInput,
+  type LotShrinkageInput,
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
 
@@ -289,26 +291,12 @@ export async function registerStockEntry(
     p_no_expiration: result.data.no_expiration ?? false,
     p_supplier: result.data.supplier ?? null,
     p_notes: result.data.notes ?? null,
+    p_suggested_price: result.data.suggested_price ?? null,
   });
 
   if (rpcError) {
     logError("register_stock_entry", rpcError);
     return { success: false, error: friendlyLotError(rpcError) };
-  }
-
-  // suggested_price es metadata informativa (preview de margen en UX),
-  // no entra en deduct_stock ni afecta ventas. Update directo es seguro
-  // porque la columna no esta en el REVOKE de invariantes y RLS filtra
-  // por admin_id.
-  if (lotId && result.data.suggested_price !== undefined) {
-    const { error: priceError } = await ctx.supabase
-      .from("product_lots")
-      .update({ suggested_price: result.data.suggested_price })
-      .eq("id", lotId)
-      .eq("admin_id", ctx.user.id);
-    if (priceError) {
-      logError("set_suggested_price", priceError, { lot_id: lotId });
-    }
   }
 
   logOperacion(
@@ -554,7 +542,18 @@ export async function updateBatch(
     return { success: false, error: result.error.issues[0].message };
   }
 
-  const { lot_id, supplier, notes, expires_at, clear_expiration, lot_number } = result.data;
+  const {
+    lot_id,
+    supplier,
+    notes,
+    expires_at,
+    clear_expiration,
+    lot_number,
+    suggested_price,
+    clear_suggested_price,
+    quantity_received,
+    correction_reason,
+  } = result.data;
 
   const { error } = await ctx.supabase.rpc("update_lot_metadata", {
     p_lot_id: lot_id,
@@ -564,6 +563,10 @@ export async function updateBatch(
     p_expires_at: expires_at ?? null,
     p_lot_number: lot_number ?? null,
     p_clear_expiration: clear_expiration ?? false,
+    p_suggested_price: suggested_price ?? null,
+    p_clear_suggested_price: clear_suggested_price ?? false,
+    p_quantity_received: quantity_received ?? null,
+    p_correction_reason: correction_reason ?? null,
   });
 
   if (error) {
@@ -583,8 +586,48 @@ export async function updateBatch(
         notes: notes !== undefined,
         expires_at: expires_at !== undefined || clear_expiration === true,
         lot_number: lot_number !== undefined,
+        suggested_price: suggested_price !== undefined || clear_suggested_price === true,
+        quantity_received: quantity_received !== undefined,
       },
+      correction_reason: correction_reason ?? null,
     },
+    ctx.user.id
+  );
+
+  revalidatePath("/inventory");
+  return { success: true };
+}
+
+export async function registerLotShrinkage(
+  input: LotShrinkageInput
+): Promise<ActionResponse> {
+  const ctx = await verifyAdmin();
+  if (!ctx) return { success: false, error: "Unauthorized" };
+
+  const result = lotShrinkageSchema.safeParse(input);
+  if (!result.success) {
+    return { success: false, error: result.error.issues[0].message };
+  }
+
+  const { lot_id, quantity, reason, customer_id, notes } = result.data;
+
+  const { error } = await ctx.supabase.rpc("register_lot_outbound", {
+    p_lot_id: lot_id,
+    p_quantity: quantity,
+    p_reason: reason,
+    p_admin_id: ctx.user.id,
+    p_customer_id: customer_id ?? null,
+    p_notes: notes ?? null,
+  });
+
+  if (error) {
+    logError("register_lot_shrinkage", error, { lot_id, quantity, reason });
+    return { success: false, error: error.message };
+  }
+
+  logOperacion(
+    "lot_shrinkage_registered",
+    { lot_id, quantity, reason, customer_id: customer_id ?? null },
     ctx.user.id
   );
 

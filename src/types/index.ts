@@ -108,18 +108,62 @@ export const closeBatchSchema = z
     path: ["reason"],
   });
 
-export const updateBatchSchema = z.object({
-  lot_id: z.string().uuid(),
-  supplier: z.string().max(100).optional(),
-  notes: z.string().max(500).optional(),
-  expires_at: z.string().optional(),
-  clear_expiration: z.boolean().optional(),
-  lot_number: z
-    .string()
-    .max(50)
-    .regex(lotNumberRegex, "Solo letras, numeros, guiones y guiones bajos")
-    .optional(),
-});
+export const updateBatchSchema = z
+  .object({
+    lot_id: z.string().uuid(),
+    supplier: z.string().max(100).optional(),
+    notes: z.string().max(500).optional(),
+    expires_at: z.string().optional(),
+    clear_expiration: z.boolean().optional(),
+    lot_number: z
+      .string()
+      .max(50)
+      .regex(lotNumberRegex, "Solo letras, numeros, guiones y guiones bajos")
+      .optional(),
+    suggested_price: z
+      .number()
+      .min(0, "El precio sugerido no puede ser negativo")
+      .optional(),
+    clear_suggested_price: z.boolean().optional(),
+    quantity_received: z
+      .number()
+      .int()
+      .positive("La cantidad recibida debe ser mayor a cero")
+      .max(100000, "Cantidad demasiado alta para un solo lote")
+      .optional(),
+    correction_reason: z
+      .string()
+      .trim()
+      .min(5, "Indica una razon de al menos 5 caracteres")
+      .max(500)
+      .optional(),
+  })
+  .refine(
+    (d) =>
+      d.quantity_received === undefined ||
+      (d.correction_reason !== undefined && d.correction_reason.trim().length >= 5),
+    {
+      message: "Indica una razon de al menos 5 caracteres para la correccion de cantidad",
+      path: ["correction_reason"],
+    }
+  );
+
+export const lotShrinkageSchema = z
+  .object({
+    lot_id: z.string().uuid(),
+    quantity: z
+      .number()
+      .int()
+      .positive("La cantidad debe ser mayor a cero")
+      .max(100000, "Cantidad demasiado alta"),
+    reason: z.enum(["merma", "muestra"]),
+    customer_id: z.string().uuid().optional(),
+    notes: z.string().max(500).optional(),
+  })
+  .refine((d) => d.reason !== "muestra" || !!d.customer_id, {
+    message: "Se requiere cliente para salidas tipo muestra",
+    path: ["customer_id"],
+  });
 
 export const orderItemSchema = z.object({
   product_id: z.string().uuid(),
@@ -259,6 +303,7 @@ export type ProductInput = z.infer<typeof productSchema>;
 export type StockEntryWithLotInput = z.infer<typeof stockEntryWithLotSchema>;
 export type CloseBatchInput = z.infer<typeof closeBatchSchema>;
 export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
+export type LotShrinkageInput = z.infer<typeof lotShrinkageSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;

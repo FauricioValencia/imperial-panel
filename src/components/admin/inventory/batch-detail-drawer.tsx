@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Calendar, Truck, AlertTriangle, X, Save, Lock } from "lucide-react";
+import { Calendar, Truck, AlertTriangle, X, Save, PackageMinus } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -24,10 +24,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { closeBatch, getBatch, updateBatch } from "@/actions/inventory";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { getBatch, registerLotShrinkage, updateBatch } from "@/actions/inventory";
+import { listCustomers } from "@/actions/customers";
 import { getLotProfitability } from "@/actions/lot-analytics";
 import { formatCurrency } from "@/lib/format";
-import type { BatchDetail, LotProfitabilityRow } from "@/types";
+import { CustomerCombobox } from "./customer-combobox";
+import type { BatchDetail, Customer, LotProfitabilityRow } from "@/types";
 
 interface BatchDetailDrawerProps {
   lotId: string | null;
@@ -73,7 +82,7 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [closing, setClosing] = useState(false);
+  const [shrinking, setShrinking] = useState(false);
 
   // Reset + fetch al cambiar de lote: patron "reset state on prop change".
   // Linter estricto de React 19 reporta setState dentro de effect, pero aqui
@@ -86,7 +95,7 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
       setProfitability([]);
       setError(null);
       setEditing(false);
-      setClosing(false);
+      setShrinking(false);
       return;
     }
     setLoading(true);
@@ -163,7 +172,7 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
 
             <BatchMovements detail={detail} />
 
-            {detail.active && (
+            {detail.active && detail.quantity_remaining > 0 && (
               <>
                 <Separator />
 
@@ -171,20 +180,19 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setEditing(true)}
+                    onClick={() => setShrinking(true)}
                     className="w-full sm:w-auto"
                   >
-                    <Save className="mr-2 h-4 w-4" />
-                    Editar metadatos
+                    <PackageMinus className="mr-2 h-4 w-4" />
+                    Registrar merma / muestra
                   </Button>
                   <Button
                     type="button"
-                    variant="destructive"
-                    onClick={() => setClosing(true)}
-                    className="w-full sm:w-auto"
+                    onClick={() => setEditing(true)}
+                    className="w-full bg-[#1E3A5F] hover:bg-[#2d4f7a] sm:w-auto"
                   >
-                    <Lock className="mr-2 h-4 w-4" />
-                    Cerrar lote
+                    <Save className="mr-2 h-4 w-4" />
+                    Editar lote
                   </Button>
                 </div>
               </>
@@ -205,12 +213,12 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
         )}
 
         {detail && (
-          <CloseBatchDialog
-            open={closing}
-            onClose={() => setClosing(false)}
+          <LotShrinkageDialog
+            open={shrinking}
+            onClose={() => setShrinking(false)}
             detail={detail}
-            onClosed={() => {
-              setClosing(false);
+            onSaved={() => {
+              setShrinking(false);
               refresh();
             }}
           />
@@ -567,8 +575,32 @@ function EditMetadataDialog({
     detail.expires_at ? detail.expires_at.slice(0, 10) : ""
   );
   const [clearExpiration, setClearExpiration] = useState(detail.expires_at === null);
+  const [suggestedPrice, setSuggestedPrice] = useState(
+    detail.suggested_price !== null ? String(detail.suggested_price) : ""
+  );
+  const [quantityReceived, setQuantityReceived] = useState(String(detail.quantity_received));
+  const [correctionReason, setCorrectionReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const parsedSuggested =
+    suggestedPrice.trim().length > 0 ? Number(suggestedPrice) : null;
+  const suggestedChanged = parsedSuggested !== detail.suggested_price;
+  const clearSuggestedPrice =
+    detail.suggested_price !== null && suggestedPrice.trim().length === 0;
+
+  const parsedQty = Number.parseInt(quantityReceived, 10);
+  const qtyChanged =
+    Number.isFinite(parsedQty) && parsedQty !== detail.quantity_received;
+  const minAllowedQty = detail.consumed_quantity;
+  const qtyBelowConsumed = qtyChanged && parsedQty < minAllowedQty;
+  const qtyDelta = qtyChanged ? parsedQty - detail.quantity_received : 0;
+
+  const submitDisabled =
+    isPending ||
+    qtyBelowConsumed ||
+    (qtyChanged && correctionReason.trim().length < 5) ||
+    (suggestedChanged && parsedSuggested !== null && parsedSuggested < 0);
 
   function handleSubmit() {
     setError(null);
@@ -580,6 +612,11 @@ function EditMetadataDialog({
         lot_number: lotNumber !== detail.lot_number ? lotNumber : undefined,
         expires_at: clearExpiration ? undefined : expiresAt || undefined,
         clear_expiration: clearExpiration,
+        suggested_price:
+          suggestedChanged && parsedSuggested !== null ? parsedSuggested : undefined,
+        clear_suggested_price: clearSuggestedPrice,
+        quantity_received: qtyChanged ? parsedQty : undefined,
+        correction_reason: qtyChanged ? correctionReason.trim() : undefined,
       });
       if (!res.success) {
         setError(res.error ?? "Error al actualizar el lote");
@@ -591,12 +628,12 @@ function EditMetadataDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar metadatos del lote</DialogTitle>
+          <DialogTitle>Editar lote</DialogTitle>
           <DialogDescription>
-            Solo se pueden editar datos descriptivos. El costo unitario y la cantidad
-            no son modificables.
+            El costo unitario no es modificable (rompe el COGS historico). Para corregir
+            la cantidad recibida indica una razon.
           </DialogDescription>
         </DialogHeader>
 
@@ -608,6 +645,62 @@ function EditMetadataDialog({
               value={lotNumber}
               onChange={(e) => setLotNumber(e.target.value)}
               maxLength={50}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="quantity-received">Cantidad recibida</Label>
+            <Input
+              id="quantity-received"
+              type="number"
+              min={Math.max(minAllowedQty, 1)}
+              max={100000}
+              value={quantityReceived}
+              onChange={(e) => setQuantityReceived(e.target.value)}
+            />
+            <p className="text-xs text-[#64748B]">
+              Consumido / asignado: {minAllowedQty} unidad(es). No puedes bajar de ese valor.
+            </p>
+            {qtyBelowConsumed && (
+              <p className="text-xs font-medium text-[#EF4444]">
+                La cantidad recibida no puede ser menor al consumido ({minAllowedQty}).
+              </p>
+            )}
+            {qtyChanged && !qtyBelowConsumed && (
+              <p className="text-xs text-[#F59E0B]">
+                Ajustaras el restante en {qtyDelta > 0 ? "+" : ""}
+                {qtyDelta} unidad(es) y se registrara un movimiento de tipo ajuste.
+              </p>
+            )}
+          </div>
+
+          {qtyChanged && (
+            <div className="space-y-1">
+              <Label htmlFor="correction-reason">Razon de la correccion *</Label>
+              <Textarea
+                id="correction-reason"
+                value={correctionReason}
+                onChange={(e) => setCorrectionReason(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder="Ej: error de digitacion al recibir, llegaron 2 cajas extra que no se contaron"
+              />
+              {correctionReason.trim().length > 0 && correctionReason.trim().length < 5 && (
+                <p className="text-xs text-[#EF4444]">Minimo 5 caracteres</p>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <Label htmlFor="suggested-price">Precio sugerido</Label>
+            <Input
+              id="suggested-price"
+              type="number"
+              min={0}
+              step="0.01"
+              value={suggestedPrice}
+              onChange={(e) => setSuggestedPrice(e.target.value)}
+              placeholder="Vacio = usar precio del producto"
             />
           </div>
 
@@ -669,7 +762,7 @@ function EditMetadataDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending}
+            disabled={submitDisabled}
             className="bg-[#1E3A5F] hover:bg-[#2d4f7a]"
           >
             {isPending ? "Guardando..." : "Guardar"}
@@ -680,36 +773,72 @@ function EditMetadataDialog({
   );
 }
 
-function CloseBatchDialog({
+function LotShrinkageDialog({
   open,
   onClose,
   detail,
-  onClosed,
+  onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   detail: BatchDetail;
-  onClosed: () => void;
+  onSaved: () => void;
 }) {
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<"merma" | "muestra">("merma");
+  const [quantity, setQuantity] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const hasActive = detail.total_allocated_active > 0;
+  // Reset al abrir/cerrar
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (open) {
+      setReason("merma");
+      setQuantity("");
+      setCustomerId("");
+      setNotes("");
+      setError(null);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open]);
+
+  function ensureCustomersLoaded() {
+    if (customers.length > 0 || loadingCustomers) return;
+    setLoadingCustomers(true);
+    listCustomers().then((res) => {
+      if (res.success && res.data) setCustomers(res.data);
+      setLoadingCustomers(false);
+    });
+  }
+
+  const parsedQty = Number.parseInt(quantity, 10);
+  const validQty = Number.isFinite(parsedQty) && parsedQty > 0;
+  const exceedsRemaining = validQty && parsedQty > detail.quantity_remaining;
+  const submitDisabled =
+    isPending ||
+    !validQty ||
+    exceedsRemaining ||
+    (reason === "muestra" && !customerId);
 
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
-      const res = await closeBatch({
+      const res = await registerLotShrinkage({
         lot_id: detail.id,
-        force: hasActive,
-        reason: reason.trim() || undefined,
+        quantity: parsedQty,
+        reason,
+        customer_id: reason === "muestra" ? customerId : undefined,
+        notes: notes.trim() || undefined,
       });
       if (!res.success) {
-        setError(res.error ?? "Error al cerrar el lote");
+        setError(res.error ?? "Error al registrar la salida");
         return;
       }
-      onClosed();
+      onSaved();
     });
   }
 
@@ -717,57 +846,111 @@ function CloseBatchDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cerrar lote {detail.lot_number}</DialogTitle>
+          <DialogTitle>Registrar merma / muestra del lote</DialogTitle>
           <DialogDescription>
-            El lote quedara inactivo y dejara de asignarse en nuevos pedidos.
-            Las {detail.quantity_remaining} unidades restantes ya no podran venderse.
+            Esta salida descontara unidades especificamente de{" "}
+            <span className="font-mono">{detail.lot_number}</span> sin pasar por FIFO.
           </DialogDescription>
         </DialogHeader>
 
-        {hasActive && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <p className="flex items-center gap-2 font-medium">
-              <AlertTriangle className="h-4 w-4" />
-              Cierre forzado
-            </p>
-            <p className="mt-1">
-              Este lote tiene <strong>{detail.total_allocated_active}</strong> unidad(es)
-              asignada(s) en pedidos activos. El cierre no las cancelara, pero requiere
-              que indiques una razon.
-            </p>
+        <div className="space-y-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+            <span className="text-[#64748B]">Restante en el lote: </span>
+            <span className="font-semibold text-[#1E293B]">
+              {detail.quantity_remaining} unidad(es)
+            </span>
           </div>
-        )}
 
-        <div className="space-y-1">
-          <Label htmlFor="close-reason">
-            Razon{hasActive ? " *" : " (opcional)"}
-          </Label>
-          <Textarea
-            id="close-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            maxLength={500}
-            placeholder="Ej: Lote con defecto detectado por cliente"
-          />
+          <div className="space-y-1">
+            <Label htmlFor="shrink-reason">Razon *</Label>
+            <Select
+              value={reason}
+              onValueChange={(v) => {
+                const next = v as "merma" | "muestra";
+                setReason(next);
+                if (next === "merma") setCustomerId("");
+                if (next === "muestra") ensureCustomersLoaded();
+              }}
+              disabled={isPending}
+            >
+              <SelectTrigger id="shrink-reason">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="merma">Merma (perdida / deterioro)</SelectItem>
+                <SelectItem value="muestra">Muestra a cliente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {reason === "muestra" && (
+            <div className="space-y-1">
+              <Label htmlFor="shrink-customer">Cliente *</Label>
+              <CustomerCombobox
+                id="shrink-customer"
+                customers={customers}
+                value={customerId}
+                onChange={setCustomerId}
+                disabled={isPending || loadingCustomers}
+              />
+              {loadingCustomers && (
+                <p className="text-xs text-[#64748B]">Cargando clientes...</p>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <Label htmlFor="shrink-quantity">Cantidad *</Label>
+            <Input
+              id="shrink-quantity"
+              type="number"
+              min={1}
+              max={detail.quantity_remaining}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              disabled={isPending}
+            />
+            {exceedsRemaining && (
+              <p className="text-xs font-medium text-[#EF4444]">
+                Supera el restante del lote ({detail.quantity_remaining}).
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="shrink-notes">Notas</Label>
+            <Textarea
+              id="shrink-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder={
+                reason === "merma"
+                  ? "Ej: jugo derramado al recibir el lote"
+                  : "Ej: muestra promocional entregada"
+              }
+            />
+          </div>
+
+          {error && (
+            <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
         </div>
-
-        {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-            {error}
-          </p>
-        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>
+            <X className="mr-2 h-4 w-4" />
             Cancelar
           </Button>
           <Button
-            variant="destructive"
             onClick={handleSubmit}
-            disabled={isPending || (hasActive && reason.trim().length === 0)}
+            disabled={submitDisabled}
+            className="bg-[#F59E0B] text-white hover:bg-[#d97706]"
           >
-            {isPending ? "Cerrando..." : "Cerrar lote"}
+            {isPending ? "Registrando..." : "Registrar salida"}
           </Button>
         </DialogFooter>
       </DialogContent>
