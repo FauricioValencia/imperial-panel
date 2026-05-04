@@ -35,11 +35,13 @@ function defaultExpirationDate(): string {
 export function StockEntryDialog({ open, onClose, product }: StockEntryDialogProps) {
   const [state, formAction, isPending] = useActionState(registerStockEntry, initialState);
   const prevSuccessRef = useRef(false);
+  const lotNumberInputRef = useRef<HTMLInputElement>(null);
 
   const [quantity, setQuantity] = useState<number>(0);
   const [unitCost, setUnitCost] = useState<number>(0);
   const [suggestedPrice, setSuggestedPrice] = useState<number>(0);
   const [noExpiration, setNoExpiration] = useState(false);
+  const [recentLotNumbers, setRecentLotNumbers] = useState<string[]>([]);
 
   useEffect(() => {
     if (state.success && !prevSuccessRef.current) {
@@ -47,6 +49,14 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
     }
     prevSuccessRef.current = state.success;
   }, [state.success, onClose]);
+
+  // Foco al input de numero de lote cuando el error sugiere duplicado:
+  // permite al admin escribir uno manual sin clicks extra.
+  useEffect(() => {
+    if (state.error && /n[uú]mero/i.test(state.error) && lotNumberInputRef.current) {
+      lotNumberInputRef.current.focus();
+    }
+  }, [state.error]);
 
   // Reset al abrir el dialog: patron "reset state on prop change".
   // Dialog de shadcn no desmonta el contenido cuando open cambia, asi que
@@ -59,9 +69,32 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
       setUnitCost(0);
       setSuggestedPrice(product?.price ?? 0);
       setNoExpiration(false);
+      setRecentLotNumbers([]);
       /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open, product]);
+
+  // Cargar los ultimos numeros de lote del producto como referencia para
+  // el admin cuando quiera ingresar uno manual. Se ordena DESC por
+  // received_at en cliente (la action retorna ASC).
+  useEffect(() => {
+    if (!open || !product?.id) return;
+    let cancelled = false;
+    listLots(product.id).then((res) => {
+      if (cancelled) return;
+      if (res.success && res.data) {
+        const recent = res.data
+          .slice()
+          .reverse()
+          .slice(0, RECENT_LOTS_COUNT)
+          .map((lot) => lot.lot_number);
+        setRecentLotNumbers(recent);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, product?.id]);
 
   // Preview de margen: usa suggested_price del lote si fue ingresado;
   // si no, cae al precio del producto. Asi el admin puede experimentar
@@ -199,11 +232,19 @@ export function StockEntryDialog({ open, onClose, product }: StockEntryDialogPro
           <div className="space-y-2">
             <Label htmlFor="lot_number">Número de lote (opcional)</Label>
             <Input
+              ref={lotNumberInputRef}
               id="lot_number"
               name="lot_number"
               placeholder="Se genera automáticamente si lo dejas vacío"
               disabled={isPending}
+              maxLength={50}
             />
+            {recentLotNumbers.length > 0 && (
+              <p className="text-xs text-[#64748B]">
+                Lotes recientes:{" "}
+                <span className="font-mono">{recentLotNumbers.join(" · ")}</span>
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
