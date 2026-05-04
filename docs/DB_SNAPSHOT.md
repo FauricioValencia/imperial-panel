@@ -1,6 +1,6 @@
 # DB Snapshot - Imperial Apps
 
-> Generado automaticamente el 2026-05-04 16:04:42
+> Generado automaticamente el 2026-05-04 16:11:45
 > **NO editar manualmente.** Ejecutar `./scripts/db-snapshot.sh` para regenerar.
 
 ---
@@ -145,6 +145,7 @@
 | created_at | timestamp with time zone | YES | now() |
 | updated_at | timestamp with time zone | YES | now() |
 | admin_id | uuid | NO |  |
+| order_type | text | NO | 'delivery'::text |
 
 ### `outbound_lot_allocations`
 | Columna | Tipo | Nullable | Default |
@@ -521,10 +522,10 @@ UNION ALL
 | courier_inventory | courier_inventory_lot_id_fkey | FOREIGN KEY | lot_id -> product_lots(id) |
 | courier_inventory | courier_inventory_product_id_fkey | FOREIGN KEY | product_id -> products(id) |
 | courier_inventory | courier_inventory_pkey | PRIMARY KEY | id |
-| courier_inventory | courier_inventory_unique | UNIQUE | courier_id |
+| courier_inventory | courier_inventory_unique | UNIQUE | lot_id |
 | courier_inventory | courier_inventory_unique | UNIQUE | courier_id |
 | courier_inventory | courier_inventory_unique | UNIQUE | lot_id |
-| courier_inventory | courier_inventory_unique | UNIQUE | lot_id |
+| courier_inventory | courier_inventory_unique | UNIQUE | courier_id |
 | customer_charges | 2200_41854_11_not_null | CHECK |  |
 | customer_charges | 2200_41854_12_not_null | CHECK |  |
 | customer_charges | 2200_41854_1_not_null | CHECK |  |
@@ -558,9 +559,9 @@ UNION ALL
 | delivery_attempts | delivery_attempts_courier_id_fkey | FOREIGN KEY | courier_id -> users(id) |
 | delivery_attempts | delivery_attempts_order_id_fkey | FOREIGN KEY | order_id -> orders(id) |
 | delivery_attempts | delivery_attempts_pkey | PRIMARY KEY | id |
+| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
+| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
 | delivery_attempts | delivery_attempts_unique | UNIQUE | attempt_key |
-| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
-| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
 | delivery_attempts | delivery_attempts_unique | UNIQUE | attempt_key |
 | inventory_movements | 2200_17603_1_not_null | CHECK |  |
 | inventory_movements | 2200_17603_2_not_null | CHECK |  |
@@ -590,10 +591,12 @@ UNION ALL
 | order_items | pedido_items_producto_id_fkey | FOREIGN KEY | product_id -> products(id) |
 | order_items | pedido_items_pkey | PRIMARY KEY | id |
 | orders | 2200_17535_11_not_null | CHECK |  |
+| orders | 2200_17535_12_not_null | CHECK |  |
 | orders | 2200_17535_1_not_null | CHECK |  |
 | orders | 2200_17535_2_not_null | CHECK |  |
 | orders | 2200_17535_4_not_null | CHECK |  |
 | orders | 2200_17535_5_not_null | CHECK |  |
+| orders | orders_order_type_check | CHECK | CHECK ((order_type = ANY (ARRAY['delivery'::text, 'direct'::text]))) |
 | orders | orders_status_check | CHECK | CHECK ((status = ANY (ARRAY['pending'::text, 'assigned'::text, 'in_transit'::text, 'delivered'::text, 'returned'::text, 'partial'::text]))) |
 | orders | orders_admin_id_fkey | FOREIGN KEY |  |
 | orders | pedidos_cliente_id_fkey | FOREIGN KEY | customer_id -> customers(id) |

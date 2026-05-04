@@ -54,6 +54,7 @@ export default async function OrderDetailPage({
   const order = orderResult.data;
   const couriers = couriersResult.data ?? [];
   const config = statusConfig[order.status] || statusConfig.pending;
+  const esVentaDirecta = order.order_type === "direct";
 
   return (
     <div className="space-y-6">
@@ -98,10 +99,21 @@ export default async function OrderDetailPage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm text-[#64748B]">Domiciliario</CardTitle>
+            <CardTitle className="text-sm text-[#64748B]">
+              {esVentaDirecta ? "Tipo de venta" : "Domiciliario"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {order.courier ? (
+            {esVentaDirecta ? (
+              <div className="space-y-1">
+                <Badge variant="outline" className="border-[#10B981] text-[#059669]">
+                  Venta directa (mostrador)
+                </Badge>
+                <p className="text-sm text-[#64748B]">
+                  Stock descontado de bodega central al registrar la venta.
+                </p>
+              </div>
+            ) : order.courier ? (
               <>
                 <p className="font-medium text-[#1E293B]">{order.courier.name}</p>
                 <p className="text-sm text-[#64748B]">{order.courier.email}</p>

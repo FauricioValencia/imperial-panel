@@ -92,12 +92,17 @@ export function OrdersTable({ initialOrders, couriers }: OrdersTableProps) {
             </SelectContent>
           </Select>
         </div>
-        <Button asChild className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
-          <Link href="/orders/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Pedido
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="border-[#10B981] text-[#059669] hover:bg-emerald-50">
+            <Link href="/orders/direct">Venta directa</Link>
+          </Button>
+          <Button asChild className="bg-[#1E3A5F] hover:bg-[#2d4f7a]">
+            <Link href="/orders/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Pedido
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Mobile cards (<md) */}
@@ -109,6 +114,7 @@ export function OrdersTable({ initialOrders, couriers }: OrdersTableProps) {
         ) : (
           filtered.map((order) => {
             const config = statusConfig[order.status] || statusConfig.pending;
+            const esDirecta = order.order_type === "direct";
             return (
               <div
                 key={order.id}
@@ -123,9 +129,16 @@ export function OrdersTable({ initialOrders, couriers }: OrdersTableProps) {
                       {order.id.slice(0, 8)}
                     </p>
                   </div>
-                  <Badge variant="secondary" className={`${config.color} shrink-0`}>
-                    {config.label}
-                  </Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {esDirecta && (
+                      <Badge variant="outline" className="border-[#10B981] text-[#059669]">
+                        Directa
+                      </Badge>
+                    )}
+                    <Badge variant="secondary" className={config.color}>
+                      {config.label}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="mt-2 flex items-center justify-between text-xs text-[#64748B]">
@@ -188,6 +201,7 @@ export function OrdersTable({ initialOrders, couriers }: OrdersTableProps) {
             ) : (
               filtered.map((order) => {
                 const config = statusConfig[order.status] || statusConfig.pending;
+                const esDirecta = order.order_type === "direct";
                 return (
                   <TableRow key={order.id}>
                     <TableCell className="hidden font-mono text-xs text-[#64748B] lg:table-cell">
@@ -200,9 +214,16 @@ export function OrdersTable({ initialOrders, couriers }: OrdersTableProps) {
                       {order.courier?.name || "—"}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary" className={config.color}>
-                        {config.label}
-                      </Badge>
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        {esDirecta && (
+                          <Badge variant="outline" className="border-[#10B981] text-[#059669]">
+                            Directa
+                          </Badge>
+                        )}
+                        <Badge variant="secondary" className={config.color}>
+                          {config.label}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-medium text-[#1E293B]">
                       {formatCurrency(order.total)}

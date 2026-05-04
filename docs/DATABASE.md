@@ -176,6 +176,7 @@ erDiagram
 | id | UUID | NO | gen_random_uuid() | PK |
 | cliente_id | UUID | NO | — | FK clientes |
 | mensajero_id | UUID | SI | — | FK usuarios, null si no asignado |
+| order_type | text | NO | delivery | CHECK: `delivery` (flujo domicilio), `direct` (venta mostrador, stock central al registrar) |
 | estado | TEXT | NO | 'pendiente' | CHECK: pendiente, asignado, en_camino, entregado, devuelto, parcial |
 | total | NUMERIC(12,2) | NO | 0 | Suma de items |
 | notas | TEXT | SI | — | |

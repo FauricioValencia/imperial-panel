@@ -15,6 +15,7 @@ export const ORDER_STATUS = [
   "returned",
   "partial",
 ] as const;
+export const ORDER_TYPE = ["delivery", "direct"] as const;
 export const PAYMENT_TYPE = ["full", "partial"] as const;
 export const PAYMENT_METHOD = ["cash", "transfer", "nequi", "daviplata"] as const;
 export const MOVEMENT_TYPE = [
@@ -222,6 +223,15 @@ export const createOrderSchema = z.object({
   allow_loss: z.boolean().optional(),
 });
 
+/** Venta en mostrador: stock central, sin courier. Sin payment_method = a crédito. */
+export const createDirectSaleSchema = z.object({
+  customer_id: z.string().uuid(),
+  items: z.array(orderItemSchema).min(1, "Debe haber al menos un producto"),
+  notes: z.string().optional(),
+  allow_loss: z.boolean().optional(),
+  payment_method: z.enum(PAYMENT_METHOD).optional(),
+});
+
 export const assignCourierSchema = z.object({
   order_id: z.string().uuid(),
   courier_id: z.string().uuid(),
@@ -410,6 +420,7 @@ export interface ListLotsResult {
   total_pages: number;
 }
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type CreateDirectSaleInput = z.infer<typeof createDirectSaleSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
 export type AddManualChargeInput = z.infer<typeof addManualChargeSchema>;
@@ -437,6 +448,7 @@ export type ResolveAdjustmentInput = z.infer<typeof resolveAdjustmentSchema>;
 
 export type UserRole = (typeof USER_ROLE)[number];
 export type OrderStatus = (typeof ORDER_STATUS)[number];
+export type OrderType = (typeof ORDER_TYPE)[number];
 export type PaymentType = (typeof PAYMENT_TYPE)[number];
 export type PaymentMethod = (typeof PAYMENT_METHOD)[number];
 export type MovementType = (typeof MOVEMENT_TYPE)[number];
@@ -594,6 +606,7 @@ export interface Order {
   id: string;
   customer_id: string;
   courier_id: string | null;
+  order_type: OrderType;
   status: OrderStatus;
   total: number;
   notes: string | null;
@@ -751,6 +764,15 @@ export interface InventoryGlobalRow {
   in_couriers_available: number;
   in_couriers_total: number;
   available_global: number;
+}
+
+/** Producto listado para venta directa (solo stock bodega central). */
+export interface DirectSaleProductOption {
+  id: string;
+  name: string;
+  codigo: string | null;
+  price: number;
+  warehouse_available: number;
 }
 
 export interface StockTransfer {

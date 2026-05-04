@@ -286,11 +286,14 @@ export async function assignCourier(
   // Verify order exists and is pending; obtener items para validar bodega courier
   const { data: order } = await ctx.supabase
     .from("orders")
-    .select("id, status, items:order_items(product_id, quantity)")
+    .select("id, status, order_type, items:order_items(product_id, quantity)")
     .eq("id", orderId)
     .single();
 
   if (!order) return { success: false, error: "Order not found" };
+  if ("order_type" in order && order.order_type === "direct") {
+    return { success: false, error: "Las ventas directas no se asignan a domiciliario" };
+  }
   if (order.status !== "pending") {
     return { success: false, error: "Order must be pending to assign a courier" };
   }

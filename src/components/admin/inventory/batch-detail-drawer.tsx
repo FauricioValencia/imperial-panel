@@ -36,7 +36,7 @@ import { listCustomers } from "@/actions/customers";
 import { getLotProfitability } from "@/actions/lot-analytics";
 import { formatCurrency } from "@/lib/format";
 import { CustomerCombobox } from "./customer-combobox";
-import type { BatchDetail, Customer, LotProfitabilityRow } from "@/types";
+import type { BatchDetail, Customer, InventoryMovement, LotProfitabilityRow } from "@/types";
 
 interface BatchDetailDrawerProps {
   lotId: string | null;
@@ -519,6 +519,28 @@ function AllocationRow({ alloc }: { alloc: BatchDetail["allocations"][number] })
   );
 }
 
+// Tipos de movimiento que siempre restan stock (cantidad siempre positiva en DB).
+const ALWAYS_NEGATIVE_TYPES = new Set(["outbound", "transfer_out"]);
+// Tipos que siempre suman stock (cantidad siempre positiva en DB).
+const ALWAYS_POSITIVE_TYPES = new Set(["inbound", "return", "transfer_in"]);
+
+function getMovementSign(m: InventoryMovement): { isNegative: boolean; display: number } {
+  if (ALWAYS_NEGATIVE_TYPES.has(m.type)) {
+    return { isNegative: true, display: Math.abs(m.quantity) };
+  }
+  if (ALWAYS_POSITIVE_TYPES.has(m.type)) {
+    return { isNegative: false, display: Math.abs(m.quantity) };
+  }
+  // Para adjustment: desde migración 023 la quantity tiene signo.
+  // Datos históricos (abs) se detectan via notes que contienen "(-N unidades)".
+  if (m.type === "adjustment") {
+    const isNegative =
+      m.quantity < 0 || (m.notes?.includes("(-") ?? false);
+    return { isNegative, display: Math.abs(m.quantity) };
+  }
+  return { isNegative: false, display: Math.abs(m.quantity) };
+}
+
 function BatchMovements({ detail }: { detail: BatchDetail }) {
   const recent = detail.movements.slice(0, 8);
   if (recent.length === 0) {
@@ -531,27 +553,30 @@ function BatchMovements({ detail }: { detail: BatchDetail }) {
         Movimientos recientes
       </h3>
       <div className="space-y-1">
-        {recent.map((m) => (
-          <div
-            key={m.id}
-            className="flex items-center justify-between rounded-md border border-slate-100 bg-white px-2 py-1.5 text-xs"
-          >
-            <div className="min-w-0">
-              <p className="font-medium capitalize text-[#1E293B]">{m.type}</p>
-              <p className="text-[10px] text-[#64748B]">{formatDateTime(m.created_at)}</p>
+        {recent.map((m) => {
+          const { isNegative, display } = getMovementSign(m);
+          return (
+            <div
+              key={m.id}
+              className="flex items-center justify-between rounded-md border border-slate-100 bg-white px-2 py-1.5 text-xs"
+            >
+              <div className="min-w-0">
+                <p className="font-medium capitalize text-[#1E293B]">{m.type}</p>
+                <p className="text-[10px] text-[#64748B]">{formatDateTime(m.created_at)}</p>
+              </div>
+              <div className="ml-2 shrink-0 text-right">
+                <p
+                  className={`font-semibold ${
+                    isNegative ? "text-[#EF4444]" : "text-[#10B981]"
+                  }`}
+                >
+                  {isNegative ? "-" : "+"}
+                  {display}
+                </p>
+              </div>
             </div>
-            <div className="ml-2 shrink-0 text-right">
-              <p
-                className={`font-semibold ${
-                  m.type === "outbound" ? "text-[#EF4444]" : "text-[#10B981]"
-                }`}
-              >
-                {m.type === "outbound" ? "-" : "+"}
-                {m.quantity}
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
