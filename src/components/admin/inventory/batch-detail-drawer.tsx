@@ -119,24 +119,28 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
 
   return (
     <Sheet open={!!lotId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
+      <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-lg">
+        <SheetHeader className="border-b border-slate-100 px-4 py-4 sm:px-6">
           <SheetTitle className="text-[#1E3A5F]">Detalle del Lote</SheetTitle>
           <SheetDescription>
             Trazabilidad completa: stock, costo, asignaciones y movimientos.
           </SheetDescription>
         </SheetHeader>
 
-        {loading && <DrawerSkeleton />}
+        {loading && (
+          <div className="px-4 sm:px-6">
+            <DrawerSkeleton />
+          </div>
+        )}
 
         {error && (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:mx-6">
             {error}
           </div>
         )}
 
         {detail && !loading && (
-          <div className="mt-4 space-y-5">
+          <div className="space-y-5 px-4 pt-4 pb-6 sm:px-6">
             <BatchHeader detail={detail} />
 
             <Separator />
@@ -159,15 +163,16 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
 
             <BatchMovements detail={detail} />
 
-            <Separator />
+            {detail.active && (
+              <>
+                <Separator />
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              {detail.active && (
-                <>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setEditing(true)}
+                    className="w-full sm:w-auto"
                   >
                     <Save className="mr-2 h-4 w-4" />
                     Editar metadatos
@@ -176,13 +181,14 @@ export function BatchDetailDrawer({ lotId, onClose }: BatchDetailDrawerProps) {
                     type="button"
                     variant="destructive"
                     onClick={() => setClosing(true)}
+                    className="w-full sm:w-auto"
                   >
                     <Lock className="mr-2 h-4 w-4" />
                     Cerrar lote
                   </Button>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -230,14 +236,16 @@ function BatchHeader({ detail }: { detail: BatchDetail }) {
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-sm text-[#1E3A5F]">{detail.lot_number}</p>
-          <p className="text-base font-semibold text-[#1E293B]">{detail.product.name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-sm text-[#1E3A5F]">{detail.lot_number}</p>
+          <p className="text-base font-semibold wrap-break-word text-[#1E293B]">
+            {detail.product.name}
+          </p>
           {detail.product.codigo && (
             <p className="font-mono text-xs text-[#64748B]">{detail.product.codigo}</p>
           )}
         </div>
-        <Badge className={st.className}>{st.label}</Badge>
+        <Badge className={`${st.className} shrink-0 whitespace-nowrap`}>{st.label}</Badge>
       </div>
     </div>
   );
@@ -324,40 +332,46 @@ function BatchFinancialAnalysis({
         Análisis financiero
       </h3>
 
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
+        <div className="min-w-0">
           <p className="text-[#64748B]">Costo unitario</p>
-          <p className="font-semibold text-[#1E293B]">
+          <p className="font-semibold wrap-break-word text-[#1E293B]">
             {formatCurrency(detail.unit_cost)}
             {detail.is_estimated_cost && (
               <span className="ml-1 text-[10px] text-[#F59E0B]">(estimado)</span>
             )}
           </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[#64748B]">
             Precio referencia <span className="text-[10px]">({priceSource})</span>
           </p>
-          <p className="font-semibold text-[#1E293B]">{formatCurrency(referencePrice)}</p>
+          <p className="font-semibold wrap-break-word text-[#1E293B]">
+            {formatCurrency(referencePrice)}
+          </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[#64748B]">Margen estimado</p>
-          <p className={`font-semibold ${marginToneClass(estimatedMarginPct)}`}>
+          <p className={`font-semibold wrap-break-word ${marginToneClass(estimatedMarginPct)}`}>
             {formatCurrency(estimatedUnitMargin)}{" "}
             <span className="text-xs">({estimatedMarginPct.toFixed(1)}%)</span>
           </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[#64748B]">Inversión total</p>
-          <p className="font-semibold text-[#1E293B]">{formatCurrency(totalInvestment)}</p>
+          <p className="font-semibold wrap-break-word text-[#1E293B]">
+            {formatCurrency(totalInvestment)}
+          </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[#64748B]">Valor vigente</p>
-          <p className="font-semibold text-[#10B981]">{formatCurrency(remainingValue)}</p>
+          <p className="font-semibold wrap-break-word text-[#10B981]">
+            {formatCurrency(remainingValue)}
+          </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[#64748B]">Rentabilidad esperada</p>
-          <p className={`font-semibold ${marginToneClass(estimatedMarginPct)}`}>
+          <p className={`font-semibold wrap-break-word ${marginToneClass(estimatedMarginPct)}`}>
             {formatCurrency(estimatedUnitMargin * detail.quantity_received)}
           </p>
         </div>
@@ -369,21 +383,25 @@ function BatchFinancialAnalysis({
             Rentabilidad real ({realQtySold} unidades vendidas)
           </p>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
+            <div className="min-w-0">
               <p className="text-[#64748B]">Ingresos</p>
-              <p className="font-semibold text-[#1E293B]">{formatCurrency(realRevenue)}</p>
+              <p className="font-semibold wrap-break-word text-[#1E293B]">
+                {formatCurrency(realRevenue)}
+              </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[#64748B]">COGS real</p>
-              <p className="font-semibold text-[#1E293B]">{formatCurrency(realCogs)}</p>
+              <p className="font-semibold wrap-break-word text-[#1E293B]">
+                {formatCurrency(realCogs)}
+              </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[#64748B]">Margen real</p>
-              <p className={`font-semibold ${marginToneClass(realMarginPct)}`}>
+              <p className={`font-semibold wrap-break-word ${marginToneClass(realMarginPct)}`}>
                 {formatCurrency(realMargin)}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[#64748B]">Margen %</p>
               <p className={`font-semibold ${marginToneClass(realMarginPct)}`}>
                 {realMarginPct.toFixed(1)}%
