@@ -178,16 +178,18 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
               />
             </div>
             {selectedCustomer && (
-              <div className="mt-2 flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm">
-                <Check className="h-4 w-4 text-[#10B981]" />
-                <span className="font-medium text-[#1E293B]">{selectedCustomer.name}</span>
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm">
+                <Check className="h-4 w-4 shrink-0 text-[#10B981]" />
+                <span className="min-w-0 font-medium wrap-break-word text-[#1E293B]">
+                  {selectedCustomer.name}
+                </span>
                 {selectedCustomer.phone && (
-                  <span className="text-[#64748B]">— {selectedCustomer.phone}</span>
+                  <span className="shrink-0 text-[#64748B]">— {selectedCustomer.phone}</span>
                 )}
                 <button
                   type="button"
                   onClick={handleClearCustomer}
-                  className="ml-auto text-xs text-[#64748B] hover:text-[#EF4444]"
+                  className="ml-auto shrink-0 text-xs text-[#64748B] hover:text-[#EF4444]"
                 >
                   Cambiar
                 </button>
@@ -226,10 +228,10 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
           <CardTitle className="text-base text-[#1E293B]">Productos (bodega central)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-3">
-            <div className="flex-1">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 w-full sm:flex-1">
               <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                <SelectTrigger>
+                <SelectTrigger className="h-auto min-h-9 w-full min-w-0 py-2 whitespace-normal **:data-[slot=select-value]:text-left">
                   <SelectValue placeholder="Seleccionar producto..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -241,28 +243,33 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-24">
-              <Input
-                type="number"
-                min={1}
-                max={selectedProductRow?.warehouse_available || 999}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                placeholder="Cant."
-              />
+            <div className="flex shrink-0 items-end gap-2 sm:gap-3">
+              <div className="w-20 sm:w-24">
+                <Input
+                  type="number"
+                  min={1}
+                  max={selectedProductRow?.warehouse_available || 999}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  placeholder="Cant."
+                  className="min-w-0"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={handleAddItem}
+                disabled={!selectedProduct || quantity <= 0}
+                className="shrink-0 bg-[#3B82F6] hover:bg-[#2563EB]"
+                size="icon"
+                aria-label="Agregar producto"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              type="button"
-              onClick={handleAddItem}
-              disabled={!selectedProduct || quantity <= 0}
-              className="bg-[#3B82F6] hover:bg-[#2563EB]"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
           </div>
 
           {items.length > 0 && (
-            <div className="rounded-lg border border-slate-200">
+            <div className="-mx-1 overflow-x-auto rounded-lg border border-slate-200 sm:mx-0">
               <Table>
                 <TableHeader>
                   <TableRow>
