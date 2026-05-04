@@ -17,6 +17,13 @@ export const ORDER_STATUS = [
 export const PAYMENT_TYPE = ["full", "partial"] as const;
 export const PAYMENT_METHOD = ["cash", "transfer", "nequi", "daviplata"] as const;
 export const MOVEMENT_TYPE = ["inbound", "outbound", "return", "adjustment"] as const;
+export const CHARGE_TYPE = [
+  "legacy_debt",
+  "adjustment",
+  "late_fee",
+  "service",
+  "other",
+] as const;
 export const CLOSING_STATUS = ["pending", "approved", "with_difference"] as const;
 export const AUDIT_ACTION = ["INSERT", "UPDATE", "DELETE"] as const;
 
@@ -141,6 +148,31 @@ export const registerPaymentSchema = z.object({
   payment_method: z.enum(PAYMENT_METHOD).default("cash"),
 });
 
+export const addManualChargeSchema = z.object({
+  customer_id: z.string().uuid(),
+  amount: z
+    .number()
+    .positive("El monto debe ser mayor a cero")
+    .max(50_000_000, "El monto no puede superar $50.000.000")
+    .multipleOf(0.01, "Maximo dos decimales"),
+  charge_type: z.enum(CHARGE_TYPE),
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Indica un motivo de al menos 5 caracteres")
+    .max(500, "El motivo no puede superar 500 caracteres"),
+  due_date: z.string().optional(),
+});
+
+export const cancelManualChargeSchema = z.object({
+  charge_id: z.string().uuid(),
+  cancel_reason: z
+    .string()
+    .trim()
+    .min(5, "Indica un motivo de al menos 5 caracteres")
+    .max(500),
+});
+
 export const confirmDeliverySchema = z.object({
   order_id: z.string().uuid(),
   returned_items: z
@@ -230,6 +262,8 @@ export type UpdateBatchInput = z.infer<typeof updateBatchSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
+export type AddManualChargeInput = z.infer<typeof addManualChargeSchema>;
+export type CancelManualChargeInput = z.infer<typeof cancelManualChargeSchema>;
 export type ConfirmDeliveryInput = z.infer<typeof confirmDeliverySchema>;
 export type CourierInput = z.infer<typeof courierSchema>;
 export type UpdateCourierInput = z.infer<typeof updateCourierSchema>;
@@ -250,6 +284,7 @@ export type OrderStatus = (typeof ORDER_STATUS)[number];
 export type PaymentType = (typeof PAYMENT_TYPE)[number];
 export type PaymentMethod = (typeof PAYMENT_METHOD)[number];
 export type MovementType = (typeof MOVEMENT_TYPE)[number];
+export type ChargeType = (typeof CHARGE_TYPE)[number];
 
 export interface User {
   id: string;
@@ -435,6 +470,21 @@ export interface Payment {
   payment_method: PaymentMethod;
   registered_by: string;
   admin_id: string;
+  created_at: string;
+}
+
+export interface CustomerCharge {
+  id: string;
+  customer_id: string;
+  admin_id: string;
+  amount: number;
+  charge_type: ChargeType;
+  reason: string;
+  due_date: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+  created_by: string;
   created_at: string;
 }
 

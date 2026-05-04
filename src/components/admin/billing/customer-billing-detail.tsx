@@ -14,8 +14,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RegisterPaymentDialog } from "./register-payment-dialog";
+import { ManualChargesCard } from "./manual-charges-card";
 import { formatCurrency } from "@/lib/format";
-import type { Customer, Order, Payment } from "@/types";
+import type { Customer, CustomerCharge, Order, Payment } from "@/types";
 
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("es-CO", {
@@ -47,16 +48,20 @@ interface CustomerBillingDetailProps {
   customer: Customer;
   orders: Order[];
   payments: Payment[];
+  charges: CustomerCharge[];
   totalBilled: number;
   totalPaid: number;
+  totalCharges: number;
 }
 
 export function CustomerBillingDetail({
   customer,
   orders,
   payments,
+  charges,
   totalBilled,
   totalPaid,
+  totalCharges,
 }: CustomerBillingDetailProps) {
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
   const pdfUrl = `/api/pdf/ticket/${customer.id}`;
@@ -78,13 +83,21 @@ export function CustomerBillingDetail({
         </a>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-[#64748B] sm:text-sm">Total facturado</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg font-bold text-[#1E293B] sm:text-xl">{formatCurrency(totalBilled)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-[#64748B] sm:text-sm">Cargos manuales</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-bold text-[#EF4444] sm:text-xl">{formatCurrency(totalCharges)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -351,6 +364,8 @@ export function CustomerBillingDetail({
           </div>
         </CardContent>
       </Card>
+
+      <ManualChargesCard customer={customer} charges={charges} />
 
       {paymentOrder && (
         <RegisterPaymentDialog

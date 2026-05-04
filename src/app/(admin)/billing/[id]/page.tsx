@@ -16,7 +16,8 @@ export default async function CustomerBillingPage({
     notFound();
   }
 
-  const { customer, orders, payments, total_billed, total_paid } = result.data;
+  const { customer, orders, payments, charges, total_billed, total_paid, total_charges } =
+    result.data;
 
   return (
     <div className="space-y-6">
@@ -40,8 +41,10 @@ export default async function CustomerBillingPage({
         customer={customer}
         orders={orders}
         payments={payments}
+        charges={charges}
         totalBilled={total_billed}
         totalPaid={total_paid}
+        totalCharges={total_charges}
       />
     </div>
   );

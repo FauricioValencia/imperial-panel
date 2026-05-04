@@ -1,6 +1,6 @@
 # DB Snapshot - Imperial Apps
 
-> Generado automaticamente el 2026-04-30 00:51:51
+> Generado automaticamente el 2026-05-04 13:56:33
 > **NO editar manualmente.** Ejecutar `./scripts/db-snapshot.sh` para regenerar.
 
 ---
@@ -46,6 +46,22 @@
 | notes | text | YES |  |
 | created_at | timestamp with time zone | YES | now() |
 | admin_id | uuid | NO |  |
+
+### `customer_charges`
+| Columna | Tipo | Nullable | Default |
+|---------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| customer_id | uuid | NO |  |
+| admin_id | uuid | NO |  |
+| amount | numeric(12,2) | NO |  |
+| charge_type | text | NO |  |
+| reason | text | NO |  |
+| due_date | date | YES |  |
+| cancelled_at | timestamp with time zone | YES |  |
+| cancelled_by | uuid | YES |  |
+| cancel_reason | text | YES |  |
+| created_by | uuid | NO |  |
+| created_at | timestamp with time zone | NO | now() |
 
 ### `customers`
 | Columna | Tipo | Nullable | Default |
@@ -211,6 +227,37 @@
   GROUP BY pl.product_id, p.name, p.codigo, pl.admin_id;
 ```
 
+### `customer_ledger`
+```sql
+ SELECT p.id,
+    p.customer_id,
+    p.admin_id,
+    'payment'::text AS entry_type,
+    p.payment_method AS subtype,
+    - p.amount AS amount_signed,
+    p.amount,
+    p.order_id,
+    NULL::text AS reason,
+    NULL::timestamp with time zone AS cancelled_at,
+    p.registered_by AS actor_id,
+    p.created_at
+   FROM payments p
+UNION ALL
+ SELECT c.id,
+    c.customer_id,
+    c.admin_id,
+    'charge'::text AS entry_type,
+    c.charge_type AS subtype,
+    c.amount AS amount_signed,
+    c.amount,
+    NULL::uuid AS order_id,
+    c.reason,
+    c.cancelled_at,
+    c.created_by AS actor_id,
+    c.created_at
+   FROM customer_charges c;
+```
+
 ### `lot_profitability_view`
 ```sql
  SELECT a.id AS allocation_id,
@@ -325,6 +372,22 @@
 | cash_closings | cash_closings_admin_id_fkey | FOREIGN KEY |  |
 | cash_closings | cierres_caja_mensajero_id_fkey | FOREIGN KEY | courier_id -> users(id) |
 | cash_closings | cierres_caja_pkey | PRIMARY KEY | id |
+| customer_charges | 2200_41854_11_not_null | CHECK |  |
+| customer_charges | 2200_41854_12_not_null | CHECK |  |
+| customer_charges | 2200_41854_1_not_null | CHECK |  |
+| customer_charges | 2200_41854_2_not_null | CHECK |  |
+| customer_charges | 2200_41854_3_not_null | CHECK |  |
+| customer_charges | 2200_41854_4_not_null | CHECK |  |
+| customer_charges | 2200_41854_5_not_null | CHECK |  |
+| customer_charges | 2200_41854_6_not_null | CHECK |  |
+| customer_charges | customer_charges_amount_check | CHECK | CHECK (((amount > (0)::numeric) AND (amount <= (50000000)::numeric))) |
+| customer_charges | customer_charges_charge_type_check | CHECK | CHECK ((charge_type = ANY (ARRAY['legacy_debt'::text, 'adjustment'::text, 'late_fee'::text, 'service'::text, 'other'::text]))) |
+| customer_charges | customer_charges_reason_check | CHECK | CHECK (((length(TRIM(BOTH FROM reason)) >= 5) AND (length(TRIM(BOTH FROM reason)) <= 500))) |
+| customer_charges | customer_charges_admin_id_fkey | FOREIGN KEY |  |
+| customer_charges | customer_charges_cancelled_by_fkey | FOREIGN KEY |  |
+| customer_charges | customer_charges_created_by_fkey | FOREIGN KEY |  |
+| customer_charges | customer_charges_customer_id_fkey | FOREIGN KEY | customer_id -> customers(id) |
+| customer_charges | customer_charges_pkey | PRIMARY KEY | id |
 | customers | 2200_17512_1_not_null | CHECK |  |
 | customers | 2200_17512_2_not_null | CHECK |  |
 | customers | 2200_17512_8_not_null | CHECK |  |
@@ -455,6 +518,8 @@
 | idx_cash_closings_admin | cash_closings | `CREATE INDEX idx_cash_closings_admin ON public.cash_closings USING btree (admin_id)` |
 | idx_cash_closings_courier | cash_closings | `CREATE INDEX idx_cash_closings_courier ON public.cash_closings USING btree (courier_id)` |
 | idx_cash_closings_date | cash_closings | `CREATE INDEX idx_cash_closings_date ON public.cash_closings USING btree (date)` |
+| idx_customer_charges_admin | customer_charges | `CREATE INDEX idx_customer_charges_admin ON public.customer_charges USING btree (admin_id, created_at DESC)` |
+| idx_customer_charges_customer | customer_charges | `CREATE INDEX idx_customer_charges_customer ON public.customer_charges USING btree (customer_id, created_at DESC) WHERE (cancelled_at IS NULL)` |
 | customers_commercial_idx | customers | `CREATE INDEX customers_commercial_idx ON public.customers USING btree (commercial_id)` |
 | customers_preferred_courier_idx | customers | `CREATE INDEX customers_preferred_courier_idx ON public.customers USING btree (preferred_courier_id)` |
 | customers_reference_code_admin_idx | customers | `CREATE UNIQUE INDEX customers_reference_code_admin_idx ON public.customers USING btree (admin_id, lower(reference_code)) WHERE (reference_code IS NOT NULL)` |
@@ -510,6 +575,8 @@
 | public.cash_closings | courier_insert_closing | PERMISSIVE | INSERT | {authenticated} | `—` | `((get_user_role() = 'courier'::text) AND (admin_id = get_admin_id()) AND (courier_id = auth.uid()))` |
 | public.cash_closings | courier_view_own_closings | PERMISSIVE | SELECT | {authenticated} | `((get_user_role() = 'courier'::text) AND (admin_id = get_admin_id()) AND (courier_id = auth.uid()))` | `—` |
 | public.cash_closings | super_admin_full_cash_closings | PERMISSIVE | ALL | {authenticated} | `(get_user_role() = 'super_admin'::text)` | `—` |
+| public.customer_charges | admin_full_customer_charges | PERMISSIVE | ALL | {authenticated} | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()) AND (created_by = auth.uid()))` |
+| public.customer_charges | super_admin_full_customer_charges | PERMISSIVE | ALL | {authenticated} | `(get_user_role() = 'super_admin'::text)` | `—` |
 | public.customers | admin_full_customers | PERMISSIVE | ALL | {authenticated} | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` | `—` |
 | public.customers | commercial_read_customers | PERMISSIVE | SELECT | {authenticated} | `((get_user_role() = 'commercial'::text) AND (admin_id = get_admin_id()) AND (commercial_id = auth.uid()))` | `—` |
 | public.customers | commercial_update_own_customers | PERMISSIVE | UPDATE | {authenticated} | `((get_user_role() = 'commercial'::text) AND (admin_id = get_admin_id()) AND (commercial_id = auth.uid()))` | `((get_user_role() = 'commercial'::text) AND (admin_id = get_admin_id()) AND (commercial_id = auth.uid()))` |
@@ -1658,6 +1725,198 @@ CREATE OR REPLACE FUNCTION public.deduct_stock(p_product_id uuid, p_quantity int
 ```
 
 ### `  RETURN;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `END;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `$function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `enforce_customer_charge_tenant()`
+- **Retorna**: trigger
+- **Seguridad**: SECURITY DEFINER
+
+```sql
+CREATE OR REPLACE FUNCTION public.enforce_customer_charge_tenant()
+```
+
+### ` RETURNS trigger()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` LANGUAGE plpgsql()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` SECURITY DEFINER()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `AS $function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `DECLARE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_customer_admin UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_customer_active BOOLEAN;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `BEGIN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT admin_id, active()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    INTO v_customer_admin, v_customer_active()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM customers()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = NEW.customer_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_customer_admin IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Customer not found: %', NEW.customer_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF NOT v_customer_active THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Cannot add charge to inactive customer';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  -- Force admin_id from the customer record (ignore client value).()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  NEW.admin_id := v_customer_admin;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  RETURN NEW;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -4977,7 +5236,7 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
-### `  total_orders NUMERIC(12,2);()`
+### `  total_orders NUMERIC(12, 2);()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -4985,7 +5244,15 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
-### `  total_payments NUMERIC(12,2);()`
+### `  total_payments NUMERIC(12, 2);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  total_charges NUMERIC(12, 2);()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -5009,7 +5276,63 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
-### `  SELECT admin_id INTO v_admin_id FROM customers WHERE id = p_customer_id;()`
+### `  -- Lock the customer row to serialize balance updates.()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT admin_id INTO v_admin_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM customers()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = p_customer_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FOR UPDATE;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_admin_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Customer not found: %', p_customer_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -5089,6 +5412,46 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
+### `  SELECT COALESCE(SUM(amount), 0) INTO total_charges()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM customer_charges()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE customer_id = p_customer_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    AND admin_id = v_admin_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    AND cancelled_at IS NULL;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
 ### `  UPDATE customers()`
 - **Retorna**: 
 - **Seguridad**: 
@@ -5097,7 +5460,7 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
-### `  SET pending_balance = total_orders - total_payments()`
+### `  SET pending_balance = total_orders + total_charges - total_payments()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -5783,6 +6146,8 @@ CREATE OR REPLACE FUNCTION public.update_updated_at()
 
 | Trigger | Tabla | Evento | Funcion |
 |---------|-------|--------|---------|
+| audit_customer_charges | customer_charges | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
+| trg_enforce_customer_charge_tenant | customer_charges | INSERT | `EXECUTE FUNCTION enforce_customer_charge_tenant()` |
 | audit_inventory_movements | inventory_movements | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
 | audit_orders | orders | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
 | trigger_orders_updated_at | orders | UPDATE | `EXECUTE FUNCTION update_updated_at()` |
@@ -5801,6 +6166,7 @@ CREATE OR REPLACE FUNCTION public.update_updated_at()
 | audit_log | SI |
 | business_config | SI |
 | cash_closings | SI |
+| customer_charges | SI |
 | customers | SI |
 | inventory_movements | SI |
 | order_items | SI |
