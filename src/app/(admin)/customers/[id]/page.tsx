@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { getCustomer } from "@/actions/customers";
 import { listCustomerPrices } from "@/actions/customer-prices";
 import { listProducts } from "@/actions/inventory";
+import { getInventoryValuation } from "@/actions/lot-analytics";
 import { CustomerAgreedPricesSection } from "@/components/admin/customers/customer-agreed-prices-section";
 import { Button } from "@/components/ui/button";
 
@@ -13,11 +14,19 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [customerRes, pricesRes, productsRes] = await Promise.all([
+  const [customerRes, pricesRes, productsRes, valuationRes] = await Promise.all([
     getCustomer(id),
     listCustomerPrices(id),
     listProducts(),
+    getInventoryValuation(),
   ]);
+
+  const inventoryCppByProductId: Record<string, number | null> = {};
+  if (valuationRes.success && valuationRes.data) {
+    for (const v of valuationRes.data) {
+      inventoryCppByProductId[v.product_id] = v.weighted_avg_cost;
+    }
+  }
 
   if (!customerRes.success || !customerRes.data) {
     notFound();
@@ -45,6 +54,7 @@ export default async function CustomerDetailPage({
         customerName={customerRes.data.name}
         initialPrices={prices}
         products={products}
+        inventoryCppByProductId={inventoryCppByProductId}
       />
     </div>
   );

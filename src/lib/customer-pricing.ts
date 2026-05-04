@@ -89,3 +89,14 @@ export function validarItemsContraPreciosResueltos(
   if (desajustes.length > 0) return { ok: false, desajustes };
   return { ok: true };
 }
+
+/** Precio de venta menos CPP del inventario vigente (por unidad). */
+export function gananciaEstimadaPorUnidad(
+  precioAcordado: number,
+  cpp: number | string | null | undefined
+): number | null {
+  if (cpp == null || cpp === "") return null;
+  const c = Number(cpp);
+  if (!Number.isFinite(c)) return null;
+  return precioAcordado - c;
+}
