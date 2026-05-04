@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { registerStockEntry } from "@/actions/inventory";
+import { listLots, registerStockEntry } from "@/actions/inventory";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { formatCurrency } from "@/lib/format";
 import type { ActionResponse, Product } from "@/types";
 
 const initialState: ActionResponse = { success: false };
+const RECENT_LOTS_COUNT = 5;
 
 interface StockEntryDialogProps {
   open: boolean;

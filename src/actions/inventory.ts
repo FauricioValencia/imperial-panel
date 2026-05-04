@@ -19,6 +19,26 @@ import {
 } from "@/types";
 import { logOperacion, logError } from "@/lib/logger";
 
+// Mapea errores Postgres/PostgREST a mensajes amigables al admin.
+// 23505 = unique violation. El indice product_lots_lot_number_admin_idx
+// es el que protege la unicidad por (admin_id, lot_number).
+function friendlyLotError(err: { code?: string; message?: string }): string {
+  const message = err.message ?? "";
+  if (err.code === "23505" && message.includes("product_lots_lot_number_admin_idx")) {
+    return "Ya existe un lote activo con ese numero. Deja el campo vacio para autogenerarlo o usa otro numero.";
+  }
+  if (err.code === "23505") {
+    return "Ya existe un registro con ese identificador.";
+  }
+  if (err.code === "23503") {
+    return "Referencia invalida. Recarga la pagina e intenta de nuevo.";
+  }
+  if (err.code === "23514") {
+    return "Los datos no cumplen una validacion del sistema. Revisa cantidades y fechas.";
+  }
+  return "Error al crear lote. Intenta de nuevo o contacta a soporte si persiste.";
+}
+
 export async function listProducts(search?: string): Promise<ActionResponse<Product[]>> {
   const ctx = await verifyAdmin();
   if (!ctx) return { success: false, error: "Unauthorized" };
@@ -273,7 +293,7 @@ export async function registerStockEntry(
 
   if (rpcError) {
     logError("register_stock_entry", rpcError);
-    return { success: false, error: `Error al crear lote: ${rpcError.message}` };
+    return { success: false, error: friendlyLotError(rpcError) };
   }
 
   // suggested_price es metadata informativa (preview de margen en UX),
