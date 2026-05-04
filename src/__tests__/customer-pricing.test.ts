@@ -1,9 +1,21 @@
 import { describe, it, expect } from "vitest";
 import {
   PRECIO_COMPARACION_EPS,
+  gananciaEstimadaPorUnidad,
   preciosDistintos,
   validarItemsContraPreciosResueltos,
 } from "@/lib/customer-pricing";
+
+describe("gananciaEstimadaPorUnidad", () => {
+  it("resta el CPP al precio acordado", () => {
+    expect(gananciaEstimadaPorUnidad(4000, 3000)).toBe(1000);
+  });
+
+  it("devuelve null si no hay CPP", () => {
+    expect(gananciaEstimadaPorUnidad(4000, null)).toBeNull();
+    expect(gananciaEstimadaPorUnidad(4000, undefined)).toBeNull();
+  });
+});
 
 describe("preciosDistintos", () => {
   it("considera iguales dos valores dentro de la tolerancia", () => {

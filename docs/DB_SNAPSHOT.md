@@ -1,6 +1,6 @@
 # DB Snapshot - Imperial Apps
 
-> Generado automaticamente el 2026-05-04 16:11:45
+> Generado automaticamente el 2026-05-04 17:11:14
 > **NO editar manualmente.** Ejecutar `./scripts/db-snapshot.sh` para regenerar.
 
 ---
@@ -75,6 +75,19 @@
 | created_by | uuid | NO |  |
 | created_at | timestamp with time zone | NO | now() |
 
+### `customer_prices`
+| Columna | Tipo | Nullable | Default |
+|---------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| customer_id | uuid | NO |  |
+| product_id | uuid | NO |  |
+| admin_id | uuid | NO |  |
+| custom_price | numeric(12,2) | NO |  |
+| active | boolean | NO | true |
+| notes | text | YES |  |
+| created_at | timestamp with time zone | NO | now() |
+| updated_at | timestamp with time zone | NO | now() |
+
 ### `customers`
 | Columna | Tipo | Nullable | Default |
 |---------|------|----------|---------|
@@ -130,6 +143,7 @@
 | returned | boolean | YES | false |
 | returned_quantity | integer | YES | 0 |
 | admin_id | uuid | NO |  |
+| reference_unit_price | numeric(12,2) | YES |  |
 
 ### `orders`
 | Columna | Tipo | Nullable | Default |
@@ -542,6 +556,28 @@ UNION ALL
 | customer_charges | customer_charges_created_by_fkey | FOREIGN KEY |  |
 | customer_charges | customer_charges_customer_id_fkey | FOREIGN KEY | customer_id -> customers(id) |
 | customer_charges | customer_charges_pkey | PRIMARY KEY | id |
+| customer_prices | 2200_42139_1_not_null | CHECK |  |
+| customer_prices | 2200_42139_2_not_null | CHECK |  |
+| customer_prices | 2200_42139_3_not_null | CHECK |  |
+| customer_prices | 2200_42139_4_not_null | CHECK |  |
+| customer_prices | 2200_42139_5_not_null | CHECK |  |
+| customer_prices | 2200_42139_6_not_null | CHECK |  |
+| customer_prices | 2200_42139_8_not_null | CHECK |  |
+| customer_prices | 2200_42139_9_not_null | CHECK |  |
+| customer_prices | customer_prices_custom_price_check | CHECK | CHECK (((custom_price > (0)::numeric) AND (custom_price <= (50000000)::numeric))) |
+| customer_prices | customer_prices_admin_id_fkey | FOREIGN KEY |  |
+| customer_prices | customer_prices_customer_id_fkey | FOREIGN KEY | customer_id -> customers(id) |
+| customer_prices | customer_prices_product_id_fkey | FOREIGN KEY | product_id -> products(id) |
+| customer_prices | customer_prices_pkey | PRIMARY KEY | id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | product_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | product_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | product_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
 | customers | 2200_17512_1_not_null | CHECK |  |
 | customers | 2200_17512_2_not_null | CHECK |  |
 | customers | 2200_17512_8_not_null | CHECK |  |
@@ -741,6 +777,9 @@ UNION ALL
 | courier_inventory_unique | courier_inventory | `CREATE UNIQUE INDEX courier_inventory_unique ON public.courier_inventory USING btree (courier_id, lot_id)` |
 | idx_customer_charges_admin | customer_charges | `CREATE INDEX idx_customer_charges_admin ON public.customer_charges USING btree (admin_id, created_at DESC)` |
 | idx_customer_charges_customer | customer_charges | `CREATE INDEX idx_customer_charges_customer ON public.customer_charges USING btree (customer_id, created_at DESC) WHERE (cancelled_at IS NULL)` |
+| customer_prices_admin_customer_product_uq | customer_prices | `CREATE UNIQUE INDEX customer_prices_admin_customer_product_uq ON public.customer_prices USING btree (admin_id, customer_id, product_id)` |
+| idx_customer_prices_customer_active | customer_prices | `CREATE INDEX idx_customer_prices_customer_active ON public.customer_prices USING btree (customer_id, admin_id) WHERE (active = true)` |
+| idx_customer_prices_product_admin | customer_prices | `CREATE INDEX idx_customer_prices_product_admin ON public.customer_prices USING btree (product_id, admin_id) WHERE (active = true)` |
 | customers_commercial_idx | customers | `CREATE INDEX customers_commercial_idx ON public.customers USING btree (commercial_id)` |
 | customers_preferred_courier_idx | customers | `CREATE INDEX customers_preferred_courier_idx ON public.customers USING btree (preferred_courier_id)` |
 | customers_reference_code_admin_idx | customers | `CREATE UNIQUE INDEX customers_reference_code_admin_idx ON public.customers USING btree (admin_id, lower(reference_code)) WHERE (reference_code IS NOT NULL)` |
@@ -815,6 +854,8 @@ UNION ALL
 | public.courier_inventory | super_admin_full_courier_inventory | PERMISSIVE | ALL | {authenticated} | `(get_user_role() = 'super_admin'::text)` | `—` |
 | public.customer_charges | admin_full_customer_charges | PERMISSIVE | ALL | {authenticated} | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()) AND (created_by = auth.uid()))` |
 | public.customer_charges | super_admin_full_customer_charges | PERMISSIVE | ALL | {authenticated} | `(get_user_role() = 'super_admin'::text)` | `—` |
+| public.customer_prices | admin_full_customer_prices | PERMISSIVE | ALL | {authenticated} | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` |
+| public.customer_prices | super_admin_full_customer_prices | PERMISSIVE | ALL | {authenticated} | `(get_user_role() = 'super_admin'::text)` | `—` |
 | public.customers | admin_full_customers | PERMISSIVE | ALL | {authenticated} | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` | `—` |
 | public.customers | commercial_read_customers | PERMISSIVE | SELECT | {authenticated} | `((get_user_role() = 'commercial'::text) AND (admin_id = get_admin_id()) AND (commercial_id = auth.uid()))` | `—` |
 | public.customers | commercial_update_own_customers | PERMISSIVE | UPDATE | {authenticated} | `((get_user_role() = 'commercial'::text) AND (admin_id = get_admin_id()) AND (commercial_id = auth.uid()))` | `((get_user_role() = 'commercial'::text) AND (admin_id = get_admin_id()) AND (commercial_id = auth.uid()))` |
@@ -2964,6 +3005,270 @@ CREATE OR REPLACE FUNCTION public.enforce_customer_charge_tenant()
 ```
 
 ### `  -- Force admin_id from the customer record (ignore client value).()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  NEW.admin_id := v_customer_admin;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  RETURN NEW;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `END;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `$function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `enforce_customer_price_tenant()`
+- **Retorna**: trigger
+- **Seguridad**: SECURITY DEFINER
+
+```sql
+CREATE OR REPLACE FUNCTION public.enforce_customer_price_tenant()
+```
+
+### ` RETURNS trigger()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` LANGUAGE plpgsql()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` SECURITY DEFINER()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `AS $function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `DECLARE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_customer_admin UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_customer_active BOOLEAN;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_product_admin UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `BEGIN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT admin_id, active()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    INTO v_customer_admin, v_customer_active()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM customers()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = NEW.customer_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_customer_admin IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Customer not found: %', NEW.customer_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF NOT v_customer_active THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Cannot set price for inactive customer';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT admin_id INTO v_product_admin()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM products()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = NEW.product_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_product_admin IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Product not found: %', NEW.product_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_product_admin IS DISTINCT FROM v_customer_admin THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Product and customer belong to different tenants';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10531,30 +10836,6 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `    IF p_expires_at < v_received_at THEN()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `      RAISE EXCEPTION 'La fecha de vencimiento no puede ser anterior a la fecha de recepcion';()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    END IF;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
 ### `    v_new_expires_at := p_expires_at;()`
 - **Retorna**: 
 - **Seguridad**: 
@@ -10587,7 +10868,7 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `  -- Resolver nuevo lot_number (display name)()`
+### `  -- Resolver nuevo lot_number()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10635,7 +10916,7 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `  -- Procesar cambio de quantity_received (si aplica)()`
+### `  -- Validar y aplicar correccion de quantity_received()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10651,63 +10932,7 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `    IF p_quantity_received <= 0 THEN()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `      RAISE EXCEPTION 'La cantidad recibida debe ser mayor a cero';()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    END IF;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    IF p_correction_reason IS NULL OR length(trim(p_correction_reason)) < 5 THEN()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `      RAISE EXCEPTION 'Indica una razon de al menos 5 caracteres para la correccion de cantidad';()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    END IF;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
 ### `    v_consumed := v_old_qty_received - v_old_qty_remaining;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    v_delta := p_quantity_received - v_old_qty_received;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10723,7 +10948,15 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `      RAISE EXCEPTION 'La nueva cantidad recibida (%) no puede ser menor a lo ya consumido (%)',()`
+### `      RAISE EXCEPTION()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        'La cantidad recibida (%) no puede ser menor al consumido historico (%)',()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10747,7 +10980,31 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `    -- Aplicar cambio a quantity_received y quantity_remaining()`
+### `    IF p_correction_reason IS NULL OR length(trim(p_correction_reason)) < 5 THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      RAISE EXCEPTION 'Se requiere una razon de correccion de al menos 5 caracteres';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    v_delta := p_quantity_received - v_old_qty_received;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10771,7 +11028,7 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `        quantity_remaining = quantity_remaining + v_delta()`
+### `        quantity_remaining = v_old_qty_remaining + v_delta()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10780,14 +11037,6 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 ```
 
 ### `    WHERE id = p_lot_id;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    -- Ajustar stock fisico del producto()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10819,7 +11068,15 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `    -- Registrar movimiento de ajuste()`
+### `    -- Registrar movimiento de ajuste con cantidad con signo:()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    -- positivo = se agregaron unidades, negativo = se descontaron unidades.()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -10907,7 +11164,7 @@ CREATE OR REPLACE FUNCTION public.update_lot_metadata(p_lot_id uuid, p_admin_id 
 
 ```
 
-### `      v_product_id, 'adjustment', abs(v_delta), p_lot_id, v_unit_cost,()`
+### `      v_product_id, 'adjustment', v_delta, p_lot_id, v_unit_cost,()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -12189,6 +12446,9 @@ CREATE OR REPLACE FUNCTION public.validate_courier_has_stock(p_courier_id uuid, 
 | trg_refresh_courier_inventory_updated_at | courier_inventory | UPDATE | `EXECUTE FUNCTION refresh_courier_inventory_updated_at()` |
 | audit_customer_charges | customer_charges | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
 | trg_enforce_customer_charge_tenant | customer_charges | INSERT | `EXECUTE FUNCTION enforce_customer_charge_tenant()` |
+| audit_customer_prices | customer_prices | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
+| trg_customer_prices_updated_at | customer_prices | UPDATE | `EXECUTE FUNCTION update_updated_at()` |
+| trg_enforce_customer_price_tenant | customer_prices | INSERT, UPDATE | `EXECUTE FUNCTION enforce_customer_price_tenant()` |
 | audit_inventory_movements | inventory_movements | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
 | trg_block_order_items_post_delivery | order_items | UPDATE | `EXECUTE FUNCTION block_order_items_post_delivery()` |
 | audit_orders | orders | DELETE, INSERT, UPDATE | `EXECUTE FUNCTION log_audit()` |
@@ -12214,6 +12474,7 @@ CREATE OR REPLACE FUNCTION public.validate_courier_has_stock(p_courier_id uuid, 
 | cash_closings | SI |
 | courier_inventory | SI |
 | customer_charges | SI |
+| customer_prices | SI |
 | customers | SI |
 | delivery_attempts | SI |
 | inventory_movements | SI |

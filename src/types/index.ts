@@ -211,7 +211,10 @@ export const listLotsFiltersSchema = z.object({
 export const orderItemSchema = z.object({
   product_id: z.string().uuid(),
   quantity: z.number().int().positive("Quantity must be positive"),
-  unit_price: z.number().positive(),
+  unit_price: z
+    .number()
+    .positive("El precio unitario debe ser mayor a cero")
+    .max(50_000_000, "Precio unitario demasiado alto"),
 });
 
 export const createOrderSchema = z.object({
@@ -655,6 +658,8 @@ export interface OrderItem {
   product_id: string;
   quantity: number;
   unit_price: number;
+  /** Precio lista o acuerdo al crear la linea; null en datos legacy. */
+  reference_unit_price?: number | null;
   returned: boolean;
   returned_quantity: number;
   admin_id: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,9 +49,17 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const [resolvedPrices, setResolvedPrices] = useState<Record<string, number>>({});
-  const [allowPriceOverride, setAllowPriceOverride] = useState(false);
+  const [allowLoss, setAllowLoss] = useState(false);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
+
+  const suggestedPriceByProductId = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of products) {
+      m[p.id] = resolvedPrices[p.id] ?? p.price;
+    }
+    return m;
+  }, [products, resolvedPrices]);
 
   useEffect(() => {
     if (!customerId) {
@@ -106,7 +114,7 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
     setCustomerId("");
     setCustomerSearch("");
     setResolvedPrices({});
-    setAllowPriceOverride(false);
+    setAllowLoss(false);
     setItems((prev) =>
       prev.map((i) => ({
         ...i,
@@ -146,6 +154,12 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
     setItems(items.filter((i) => i.product_id !== productId));
   }
 
+  function handleChangeUnitPrice(productId: string, unitPrice: number) {
+    setItems((prev) =>
+      prev.map((i) => (i.product_id === productId ? { ...i, unit_price: unitPrice } : i))
+    );
+  }
+
   function handleSubmit() {
     setError("");
 
@@ -159,6 +173,11 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
     }
 
     startTransition(async () => {
+      const needsPriceOverride = items.some((i) => {
+        const sug = suggestedPriceByProductId[i.product_id];
+        return Math.abs(i.unit_price - sug) >= 0.01;
+      });
+
       const result = await createOrder({
         customer_id: customerId,
         items: items.map((i) => ({
@@ -167,7 +186,8 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
           unit_price: i.unit_price,
         })),
         notes: notes || undefined,
-        allow_price_override: allowPriceOverride || undefined,
+        allow_price_override: needsPriceOverride || undefined,
+        allow_loss: allowLoss || undefined,
       });
 
       if (!result.success) {
@@ -303,31 +323,27 @@ export function CreateOrderForm({ customers, products }: CreateOrderFormProps) {
           </div>
 
           {items.length > 0 && (
-            <OrderItemsSummary items={items} onRemoveItem={handleRemoveItem} />
+            <OrderItemsSummary
+              items={items}
+              onRemoveItem={handleRemoveItem}
+              editableUnitPrice
+              onChangeUnitPrice={handleChangeUnitPrice}
+              suggestedPriceByProductId={suggestedPriceByProductId}
+            />
           )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base text-[#1E293B]">Precio manual</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-row items-start gap-3 space-y-0">
-          <Checkbox
-            id="allow-price-override-order"
-            checked={allowPriceOverride}
-            onCheckedChange={(v) => setAllowPriceOverride(v === true)}
-          />
-          <div className="space-y-1">
-            <Label htmlFor="allow-price-override-order" className="cursor-pointer font-normal">
-              Permitir precio distinto al de lista o acuerdo con el cliente
-            </Label>
-            <p className="text-xs text-[#64748B]">
-              Marca esta opcion solo si ajustaste manualmente el precio de una linea y el sistema lo rechaza.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2">
+        <Checkbox
+          id="allow-loss-order"
+          checked={allowLoss}
+          onCheckedChange={(c) => setAllowLoss(c === true)}
+        />
+        <Label htmlFor="allow-loss-order" className="cursor-pointer text-sm font-normal text-[#1E293B]">
+          Permitir venta con pérdida (precio bajo costo FIFO proyectado)
+        </Label>
+      </div>
 
       <Card>
         <CardHeader>

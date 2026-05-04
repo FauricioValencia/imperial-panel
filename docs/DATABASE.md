@@ -172,7 +172,7 @@ erDiagram
 | updated_at | TIMESTAMPTZ | NO | now() | |
 | UNIQUE | (admin_id, customer_id, product_id) | — | — | Un acuerdo por par cliente-producto por tenant |
 
-El precio efectivo al armar un pedido es `custom_price` si hay fila activa; si no, `products.price`. El snapshot comercial queda en `order_items.unit_price`.
+El precio efectivo al armar un pedido es `custom_price` si hay fila activa; si no, `products.price`. El precio cobrado queda en `order_items.unit_price`. Desde la migración `025_order_items_reference_unit_price.sql`, `order_items.reference_unit_price` guarda el precio resuelto (lista o acuerdo) en el instante de creación de la línea, para auditar descuentos o precios manuales frente a la referencia; filas anteriores pueden tener `reference_unit_price` NULL.
 
 ### productos
 | Campo | Tipo | Nullable | Default | Notas |
@@ -201,14 +201,15 @@ El precio efectivo al armar un pedido es `custom_price` si hay fila activa; si n
 | created_at | TIMESTAMPTZ | NO | now() | |
 | updated_at | TIMESTAMPTZ | NO | now() | Auto-trigger |
 
-### pedido_items
+### pedido_items (`order_items`)
 | Campo | Tipo | Nullable | Default | Notas |
 |-------|------|----------|---------|-------|
 | id | UUID | NO | gen_random_uuid() | PK |
 | pedido_id | UUID | NO | — | FK pedidos (CASCADE) |
 | producto_id | UUID | NO | — | FK productos |
 | cantidad | INTEGER | NO | — | |
-| precio_unitario | NUMERIC(12,2) | NO | — | Snapshot del precio al momento |
+| precio_unitario (`unit_price`) | NUMERIC(12,2) | NO | — | Precio cobrado (snapshot al momento) |
+| precio_referencia (`reference_unit_price`) | NUMERIC(12,2) | SI | — | Lista o acuerdo resuelto al crear la línea (migración 025) |
 | devuelto | BOOLEAN | NO | false | |
 | cantidad_devuelta | INTEGER | NO | 0 | Parcial o total |
 

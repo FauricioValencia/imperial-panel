@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,9 +51,16 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [allowLoss, setAllowLoss] = useState(false);
   const [resolvedPrices, setResolvedPrices] = useState<Record<string, number>>({});
-  const [allowPriceOverride, setAllowPriceOverride] = useState(false);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
+
+  const suggestedPriceByProductId = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of products) {
+      m[p.id] = resolvedPrices[p.id] ?? p.price;
+    }
+    return m;
+  }, [products, resolvedPrices]);
 
   useEffect(() => {
     if (!customerId) {
@@ -104,7 +111,6 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
     setCustomerId("");
     setCustomerSearch("");
     setResolvedPrices({});
-    setAllowPriceOverride(false);
     setItems((prev) =>
       prev.map((i) => ({
         ...i,
@@ -143,6 +149,12 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
     setItems(items.filter((i) => i.product_id !== productId));
   }
 
+  function handleChangeUnitPrice(productId: string, unitPrice: number) {
+    setItems((prev) =>
+      prev.map((i) => (i.product_id === productId ? { ...i, unit_price: unitPrice } : i))
+    );
+  }
+
   function handleSubmit() {
     setError("");
 
@@ -156,6 +168,11 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
     }
 
     startTransition(async () => {
+      const needsPriceOverride = items.some((i) => {
+        const sug = suggestedPriceByProductId[i.product_id];
+        return Math.abs(i.unit_price - sug) >= 0.01;
+      });
+
       const result = await createDirectSale({
         customer_id: customerId,
         items: items.map((i) => ({
@@ -166,7 +183,7 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
         notes: notes || undefined,
         allow_loss: allowLoss || undefined,
         payment_method: pagoInmediato ? paymentMethod : undefined,
-        allow_price_override: allowPriceOverride || undefined,
+        allow_price_override: needsPriceOverride || undefined,
       });
 
       if (!result.success) {
@@ -303,7 +320,13 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
           </div>
 
           {items.length > 0 && (
-            <OrderItemsSummary items={items} onRemoveItem={handleRemoveItem} />
+            <OrderItemsSummary
+              items={items}
+              onRemoveItem={handleRemoveItem}
+              editableUnitPrice
+              onChangeUnitPrice={handleChangeUnitPrice}
+              suggestedPriceByProductId={suggestedPriceByProductId}
+            />
           )}
         </CardContent>
       </Card>
@@ -375,20 +398,6 @@ export function CreateDirectSaleForm({ customers, products }: CreateDirectSaleFo
         />
         <Label htmlFor="allow-loss" className="cursor-pointer text-sm font-normal text-[#1E293B]">
           Permitir venta con pérdida (precio bajo costo FIFO proyectado)
-        </Label>
-      </div>
-
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
-        <Checkbox
-          id="allow-price-override-direct"
-          checked={allowPriceOverride}
-          onCheckedChange={(c) => setAllowPriceOverride(c === true)}
-        />
-        <Label
-          htmlFor="allow-price-override-direct"
-          className="cursor-pointer text-sm font-normal text-[#1E293B]"
-        >
-          Permitir precio distinto al de lista o acuerdo con el cliente
         </Label>
       </div>
 

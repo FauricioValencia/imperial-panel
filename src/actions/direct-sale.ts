@@ -172,7 +172,7 @@ export async function createDirectSale(
       const nm = nameById.get(first.product_id) ?? "Producto";
       return {
         success: false,
-        error: `${nm}: precio ${first.enviado} no coincide con el esperado ${Number.isFinite(first.esperado) ? first.esperado.toFixed(2) : "?"} (lista o acuerdo). Marque "Permitir precio distinto al sugerido" si es intencional.`,
+        error: `${nm}: precio ${first.enviado} no coincide con el calculado en el servidor (${Number.isFinite(first.esperado) ? first.esperado.toFixed(2) : "?"}; lista o acuerdo del cliente). Revise precios del catálogo y del cliente, actualice la página y reintente.`,
       };
     }
     logOperacion(
@@ -228,7 +228,7 @@ export async function createDirectSale(
     const extra = lossWarnings.length > 1 ? ` (y ${lossWarnings.length - 1} mas)` : "";
     return {
       success: false,
-      error: `${first.product_name}: precio ${first.unit_price} es menor al costo proyectado ${first.projected_avg_cost.toFixed(2)}${extra}. Marca "permitir venta con perdida" si es intencional.`,
+      error: `${first.product_name}: precio ${first.unit_price} por unidad está por debajo del costo proyectado (${first.projected_avg_cost.toFixed(2)} c/u)${extra}. Active la opción «Permitir venta con pérdida» en el formulario y vuelva a enviar.`,
     };
   }
 
@@ -275,6 +275,7 @@ export async function createDirectSale(
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        reference_unit_price: resolvedPrices.get(item.product_id) ?? null,
         admin_id: adminId,
       })
       .select("id, product_id, quantity")
