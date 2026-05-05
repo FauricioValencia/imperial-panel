@@ -59,10 +59,11 @@ export function AssignCourierDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { setSelectedCourier(""); setError(""); onClose(); } }}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+        <DialogHeader className="min-w-0">
           <DialogTitle className="text-[#1E293B]">Asignar Domiciliario</DialogTitle>
-          <DialogDescription>
-            Pedido para <strong>{order?.customer?.name}</strong> — Total: {order ? formatCurrency(order.total) : ""}
+          <DialogDescription className="wrap-break-word text-left">
+            Pedido para <strong>{order?.customer?.name}</strong> — Total:{" "}
+            {order ? formatCurrency(order.total) : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -72,7 +73,7 @@ export function AssignCourierDialog({
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <label className="text-sm font-medium text-[#1E293B]">
             Seleccionar domiciliario
           </label>
@@ -99,14 +100,19 @@ export function AssignCourierDialog({
           </p>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>
+        <DialogFooter className="sm:gap-2">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={onClose}
+            disabled={isPending}
+          >
             Cancelar
           </Button>
           <Button
             onClick={handleAssign}
             disabled={!selectedCourier || isPending}
-            className="bg-[#10B981] hover:bg-[#059669]"
+            className="w-full bg-[#10B981] hover:bg-[#059669] sm:w-auto"
           >
             {isPending ? "Asignando..." : "Asignar"}
           </Button>
