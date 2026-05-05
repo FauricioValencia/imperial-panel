@@ -528,29 +528,6 @@ export async function confirmDelivery(
   }
   const courierAdminId = ctx.user.admin_id;
 
-  // Idempotency: si attemptKey fue provisto, intentamos registrarlo. UNIQUE
-  // sobre (order_id, attempt_key) garantiza que un reintento del mismo
-  // request retorne exito sin re-procesar.
-  if (attemptKey) {
-    const { error: attemptError } = await ctx.supabase
-      .from("delivery_attempts")
-      .insert({
-        order_id: orderId,
-        attempt_key: attemptKey,
-        courier_id: ctx.user.id,
-        admin_id: courierAdminId,
-      });
-    if (attemptError) {
-      // 23505 = unique violation -> ya se proceso este intento
-      if (attemptError.code === "23505") {
-        logOperacion("delivery_idempotent_replay", { order_id: orderId, attempt_key: attemptKey }, ctx.user.id);
-        return { success: true };
-      }
-      logError("delivery_attempt_register", attemptError, { order_id: orderId });
-      return { success: false, error: "Error registrando intento de entrega" };
-    }
-  }
-
   // Get order items + flag legacy para decidir desde donde se descuenta el stock.
   const { data: order } = await ctx.supabase
     .from("orders")
@@ -637,6 +614,87 @@ export async function confirmDelivery(
     }
   }
 
+  // Pre-check legacy: si el pedido aun esta marcado como legacy, validamos que
+  // courier_inventory tenga stock vigente para los items ANTES de registrar el
+  // attempt_key. Esto evita "quemar" el key y devuelve un error accionable
+  // (code LEGACY_EMPTY) que la UI usa para sugerir migrar el pedido al flujo
+  // central.
+  if (useLegacyCourierDeduction) {
+    const itemsToValidate = items
+      .map((it) => {
+        const returnedQty = returnMap.get(it.id) ?? 0;
+        const swappedQty = swapByItem.get(it.id) ?? 0;
+        return {
+          product_id: it.product_id,
+          quantity: it.quantity - returnedQty - swappedQty,
+        };
+      })
+      .filter((it) => it.quantity > 0);
+
+    if (itemsToValidate.length > 0) {
+      const { data: missing, error: validateErr } = await ctx.supabase.rpc(
+        "validate_courier_has_stock",
+        { p_courier_id: ctx.user.id, p_items: itemsToValidate }
+      );
+      if (validateErr) {
+        logError("legacy_validate_stock", validateErr, { order_id: orderId });
+        return { success: false, error: "Error validando stock del courier" };
+      }
+      if (Array.isArray(missing) && missing.length > 0) {
+        const detail = (missing as { product_name: string; shortfall: number }[])
+          .map((m) => `${m.product_name}: faltan ${m.shortfall}`)
+          .join("; ");
+        return {
+          success: false,
+          error: `Tu bodega no tiene stock para esta entrega (${detail}). Pide al admin migrar el pedido al flujo central.`,
+          code: "LEGACY_EMPTY",
+        };
+      }
+    }
+  }
+
+  // Idempotency: registramos el attempt_key DESPUES de las validaciones para no
+  // quemarlo si una validacion falla. UNIQUE (order_id, attempt_key) sigue
+  // garantizando que un replay legitimo no re-procese. Si el INSERT colisiona
+  // contra una fila previa con voided_at NOT NULL (intento anterior revertido
+  // por rollbackAll), reusamos esa fila.
+  if (attemptKey) {
+    const { error: attemptError } = await ctx.supabase
+      .from("delivery_attempts")
+      .insert({
+        order_id: orderId,
+        attempt_key: attemptKey,
+        courier_id: ctx.user.id,
+        admin_id: courierAdminId,
+      });
+    if (attemptError) {
+      if (attemptError.code === "23505") {
+        const { data: existing } = await ctx.supabase
+          .from("delivery_attempts")
+          .select("id, voided_at")
+          .eq("order_id", orderId)
+          .eq("attempt_key", attemptKey)
+          .maybeSingle();
+        if (existing?.voided_at) {
+          const { error: reviveErr } = await ctx.supabase
+            .from("delivery_attempts")
+            .update({ voided_at: null })
+            .eq("id", existing.id);
+          if (reviveErr) {
+            logError("delivery_attempt_revive", reviveErr, { order_id: orderId });
+            return { success: false, error: "Error reusando intento de entrega" };
+          }
+        } else {
+          logOperacion("delivery_idempotent_replay", { order_id: orderId, attempt_key: attemptKey }, ctx.user.id);
+          return { success: true };
+        }
+      } else {
+        logError("delivery_attempt_register", attemptError, { order_id: orderId });
+        return { success: false, error: "Error registrando intento de entrega" };
+      }
+    }
+  }
+
   // Descontar stock segun el flag legacy:
   //  - Flujo nuevo: deduct_stock FIFO sobre product_lots (central). Rollback con
   //    return_stock_by_item LIFO al central.
@@ -678,6 +736,15 @@ export async function confirmDelivery(
           p_admin_id: courierAdminId,
         });
       }
+    }
+    // Soft-void del attempt para permitir un reintento limpio con el mismo key.
+    if (attemptKey) {
+      await ctx.supabase
+        .from("delivery_attempts")
+        .update({ voided_at: new Date().toISOString() })
+        .eq("order_id", orderId)
+        .eq("attempt_key", attemptKey)
+        .is("voided_at", null);
     }
   };
 

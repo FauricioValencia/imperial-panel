@@ -896,4 +896,5 @@ export interface ActionResponse<T = null> {
   success: boolean;
   data?: T;
   error?: string;
+  code?: string;
 }
