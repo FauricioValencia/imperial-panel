@@ -1,6 +1,6 @@
 # DB Snapshot - Imperial Apps
 
-> Generado automaticamente el 2026-05-04 21:58:20
+> Generado automaticamente el 2026-05-04 23:21:38
 > **NO editar manualmente.** Ejecutar `./scripts/db-snapshot.sh` para regenerar.
 
 ---
@@ -132,6 +132,19 @@
 | courier_id | uuid | YES |  |
 | transfer_id | uuid | YES |  |
 
+### `order_item_swaps`
+| Columna | Tipo | Nullable | Default |
+|---------|------|----------|---------|
+| id | uuid | NO | gen_random_uuid() |
+| order_item_id | uuid | NO |  |
+| swapped_product_id | uuid | NO |  |
+| swapped_quantity | integer | NO |  |
+| source | text | NO |  |
+| courier_id | uuid | NO |  |
+| admin_id | uuid | NO |  |
+| notes | text | YES |  |
+| created_at | timestamp with time zone | NO | now() |
+
 ### `order_items`
 | Columna | Tipo | Nullable | Default |
 |---------|------|----------|---------|
@@ -160,6 +173,7 @@
 | updated_at | timestamp with time zone | YES | now() |
 | admin_id | uuid | NO |  |
 | order_type | text | NO | 'delivery'::text |
+| legacy_courier_deduction | boolean | NO | false |
 
 ### `outbound_lot_allocations`
 | Columna | Tipo | Nullable | Default |
@@ -171,6 +185,7 @@
 | unit_cost_snapshot | numeric(14,2) | NO |  |
 | admin_id | uuid | NO |  |
 | created_at | timestamp with time zone | NO | now() |
+| swap_id | uuid | YES |  |
 
 ### `payments`
 | Columna | Tipo | Nullable | Default |
@@ -536,10 +551,10 @@ UNION ALL
 | courier_inventory | courier_inventory_lot_id_fkey | FOREIGN KEY | lot_id -> product_lots(id) |
 | courier_inventory | courier_inventory_product_id_fkey | FOREIGN KEY | product_id -> products(id) |
 | courier_inventory | courier_inventory_pkey | PRIMARY KEY | id |
-| courier_inventory | courier_inventory_unique | UNIQUE | lot_id |
+| courier_inventory | courier_inventory_unique | UNIQUE | courier_id |
 | courier_inventory | courier_inventory_unique | UNIQUE | courier_id |
 | courier_inventory | courier_inventory_unique | UNIQUE | lot_id |
-| courier_inventory | courier_inventory_unique | UNIQUE | courier_id |
+| courier_inventory | courier_inventory_unique | UNIQUE | lot_id |
 | customer_charges | 2200_41854_11_not_null | CHECK |  |
 | customer_charges | 2200_41854_12_not_null | CHECK |  |
 | customer_charges | 2200_41854_1_not_null | CHECK |  |
@@ -570,14 +585,14 @@ UNION ALL
 | customer_prices | customer_prices_product_id_fkey | FOREIGN KEY | product_id -> products(id) |
 | customer_prices | customer_prices_pkey | PRIMARY KEY | id |
 | customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | product_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
+| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
 | customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | product_id |
 | customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | product_id |
-| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
-| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
-| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | admin_id |
-| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
-| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
-| customer_prices | customer_prices_admin_customer_product_uq | UNIQUE | customer_id |
 | customers | 2200_17512_1_not_null | CHECK |  |
 | customers | 2200_17512_2_not_null | CHECK |  |
 | customers | 2200_17512_8_not_null | CHECK |  |
@@ -595,9 +610,9 @@ UNION ALL
 | delivery_attempts | delivery_attempts_courier_id_fkey | FOREIGN KEY | courier_id -> users(id) |
 | delivery_attempts | delivery_attempts_order_id_fkey | FOREIGN KEY | order_id -> orders(id) |
 | delivery_attempts | delivery_attempts_pkey | PRIMARY KEY | id |
-| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
-| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
 | delivery_attempts | delivery_attempts_unique | UNIQUE | attempt_key |
+| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
+| delivery_attempts | delivery_attempts_unique | UNIQUE | order_id |
 | delivery_attempts | delivery_attempts_unique | UNIQUE | attempt_key |
 | inventory_movements | 2200_17603_1_not_null | CHECK |  |
 | inventory_movements | 2200_17603_2_not_null | CHECK |  |
@@ -616,6 +631,21 @@ UNION ALL
 | inventory_movements | movimientos_inventario_producto_id_fkey | FOREIGN KEY | product_id -> products(id) |
 | inventory_movements | movimientos_inventario_referencia_pedido_fkey | FOREIGN KEY | order_reference -> orders(id) |
 | inventory_movements | movimientos_inventario_pkey | PRIMARY KEY | id |
+| order_item_swaps | 2200_42191_1_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_2_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_3_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_4_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_5_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_6_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_7_not_null | CHECK |  |
+| order_item_swaps | 2200_42191_9_not_null | CHECK |  |
+| order_item_swaps | order_item_swaps_source_check | CHECK | CHECK ((source = ANY (ARRAY['central'::text, 'courier_kit'::text]))) |
+| order_item_swaps | order_item_swaps_swapped_quantity_check | CHECK | CHECK ((swapped_quantity > 0)) |
+| order_item_swaps | order_item_swaps_admin_id_fkey | FOREIGN KEY | admin_id -> users(id) |
+| order_item_swaps | order_item_swaps_courier_id_fkey | FOREIGN KEY | courier_id -> users(id) |
+| order_item_swaps | order_item_swaps_order_item_id_fkey | FOREIGN KEY | order_item_id -> order_items(id) |
+| order_item_swaps | order_item_swaps_swapped_product_id_fkey | FOREIGN KEY | swapped_product_id -> products(id) |
+| order_item_swaps | order_item_swaps_pkey | PRIMARY KEY | id |
 | order_items | 2200_17558_1_not_null | CHECK |  |
 | order_items | 2200_17558_2_not_null | CHECK |  |
 | order_items | 2200_17558_3_not_null | CHECK |  |
@@ -628,6 +658,7 @@ UNION ALL
 | order_items | pedido_items_pkey | PRIMARY KEY | id |
 | orders | 2200_17535_11_not_null | CHECK |  |
 | orders | 2200_17535_12_not_null | CHECK |  |
+| orders | 2200_17535_13_not_null | CHECK |  |
 | orders | 2200_17535_1_not_null | CHECK |  |
 | orders | 2200_17535_2_not_null | CHECK |  |
 | orders | 2200_17535_4_not_null | CHECK |  |
@@ -649,6 +680,7 @@ UNION ALL
 | outbound_lot_allocations | outbound_lot_allocations_admin_id_fkey | FOREIGN KEY |  |
 | outbound_lot_allocations | outbound_lot_allocations_lot_id_fkey | FOREIGN KEY | lot_id -> product_lots(id) |
 | outbound_lot_allocations | outbound_lot_allocations_order_item_id_fkey | FOREIGN KEY | order_item_id -> order_items(id) |
+| outbound_lot_allocations | outbound_lot_allocations_swap_id_fkey | FOREIGN KEY | swap_id -> order_item_swaps(id) |
 | outbound_lot_allocations | outbound_lot_allocations_pkey | PRIMARY KEY | id |
 | payments | 2200_17576_1_not_null | CHECK |  |
 | payments | 2200_17576_2_not_null | CHECK |  |
@@ -794,6 +826,9 @@ UNION ALL
 | inventory_movements_order_item_idx | inventory_movements | `CREATE INDEX inventory_movements_order_item_idx ON public.inventory_movements USING btree (order_item_id) WHERE (order_item_id IS NOT NULL)` |
 | inventory_movements_reason_idx | inventory_movements | `CREATE INDEX inventory_movements_reason_idx ON public.inventory_movements USING btree (reason) WHERE (reason IS NOT NULL)` |
 | inventory_movements_transfer_idx | inventory_movements | `CREATE INDEX inventory_movements_transfer_idx ON public.inventory_movements USING btree (transfer_id) WHERE (transfer_id IS NOT NULL)` |
+| idx_order_item_swaps_admin | order_item_swaps | `CREATE INDEX idx_order_item_swaps_admin ON public.order_item_swaps USING btree (admin_id)` |
+| idx_order_item_swaps_courier | order_item_swaps | `CREATE INDEX idx_order_item_swaps_courier ON public.order_item_swaps USING btree (courier_id)` |
+| idx_order_item_swaps_order_item | order_item_swaps | `CREATE INDEX idx_order_item_swaps_order_item ON public.order_item_swaps USING btree (order_item_id)` |
 | idx_order_items_admin | order_items | `CREATE INDEX idx_order_items_admin ON public.order_items USING btree (admin_id)` |
 | idx_order_items_order | order_items | `CREATE INDEX idx_order_items_order ON public.order_items USING btree (order_id)` |
 | idx_orders_admin | orders | `CREATE INDEX idx_orders_admin ON public.orders USING btree (admin_id)` |
@@ -803,6 +838,7 @@ UNION ALL
 | idx_orders_status | orders | `CREATE INDEX idx_orders_status ON public.orders USING btree (status)` |
 | orders_courier_delivered_idx | orders | `CREATE INDEX orders_courier_delivered_idx ON public.orders USING btree (courier_id, delivered_at) WHERE ((delivered_at IS NOT NULL) AND (status = ANY (ARRAY['delivered'::text, 'partial'::text])))` |
 | orders_delivered_at_idx | orders | `CREATE INDEX orders_delivered_at_idx ON public.orders USING btree (delivered_at) WHERE (delivered_at IS NOT NULL)` |
+| idx_outbound_lot_allocations_swap | outbound_lot_allocations | `CREATE INDEX idx_outbound_lot_allocations_swap ON public.outbound_lot_allocations USING btree (swap_id) WHERE (swap_id IS NOT NULL)` |
 | outbound_lot_allocations_admin_idx | outbound_lot_allocations | `CREATE INDEX outbound_lot_allocations_admin_idx ON public.outbound_lot_allocations USING btree (admin_id)` |
 | outbound_lot_allocations_lot_idx | outbound_lot_allocations | `CREATE INDEX outbound_lot_allocations_lot_idx ON public.outbound_lot_allocations USING btree (lot_id)` |
 | outbound_lot_allocations_order_item_idx | outbound_lot_allocations | `CREATE INDEX outbound_lot_allocations_order_item_idx ON public.outbound_lot_allocations USING btree (order_item_id)` |
@@ -869,6 +905,8 @@ UNION ALL
 | public.inventory_movements | block_delete_inventory_movements | RESTRICTIVE | DELETE | {authenticated} | `false` | `—` |
 | public.inventory_movements | courier_read_inventory_movements | PERMISSIVE | SELECT | {authenticated} | `((get_user_role() = 'courier'::text) AND (admin_id = get_admin_id()))` | `—` |
 | public.inventory_movements | super_admin_full_inventory_movements | PERMISSIVE | ALL | {authenticated} | `(get_user_role() = 'super_admin'::text)` | `—` |
+| public.order_item_swaps | order_item_swaps_admin_select | PERMISSIVE | SELECT | {authenticated} | `(admin_id = auth.uid())` | `—` |
+| public.order_item_swaps | order_item_swaps_courier_select | PERMISSIVE | SELECT | {authenticated} | `(courier_id = auth.uid())` | `—` |
 | public.order_items | admin_full_order_items | PERMISSIVE | ALL | {authenticated} | `((get_user_role() = 'admin'::text) AND (admin_id = auth.uid()))` | `—` |
 | public.order_items | courier_view_order_items | PERMISSIVE | SELECT | {authenticated} | `((get_user_role() = 'courier'::text) AND (admin_id = get_admin_id()) AND (order_id IN ( SELECT orders.id` | `` |
 |    FROM orders |  |  |  |  | `` | `` |
@@ -988,6 +1026,14 @@ CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id
 
 ```
 
+### `  v_swap RECORD;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
 ### `  v_qty INTEGER;()`
 - **Retorna**: 
 - **Seguridad**: 
@@ -1044,7 +1090,7 @@ CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id
 
 ```
 
-### `  SELECT id, admin_id, customer_id, status, order_type, courier_id()`
+### `  SELECT id, admin_id, customer_id, status, order_type, courier_id, legacy_courier_deduction()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -1165,6 +1211,102 @@ CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id
 ```
 
 ### `  v_reason := LEFT(COALESCE(NULLIF(TRIM(p_reason), ''), 'sin motivo'), 500);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  -- Revertir swaps primero (de cualquier estado entregable; los swaps existen()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  -- solo si el courier los registro al confirmar).()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_order.status IN ('delivered', 'partial', 'returned') THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    FOR v_swap IN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SELECT s.id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FROM order_item_swaps s()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      JOIN order_items oi ON oi.id = s.order_item_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE oi.order_id = p_order_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    LOOP()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      PERFORM revert_swap(v_swap.id, p_admin_id);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END LOOP;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -1324,7 +1466,7 @@ CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id
 
 ```
 
-### `        IF v_order.courier_id IS NULL THEN()`
+### `        IF v_order.legacy_courier_deduction THEN()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -1332,7 +1474,47 @@ CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id
 
 ```
 
-### `          RAISE EXCEPTION 'Pedido de domicilio sin domiciliario asignado; no se puede revertir el inventario consumido en entrega';()`
+### `          IF v_order.courier_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `            RAISE EXCEPTION 'Pedido legacy sin domiciliario; no se puede revertir el inventario consumido en entrega';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `          END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `          PERFORM return_courier_stock_by_item(v_item.id, v_qty, p_admin_id, v_order.courier_id);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        ELSE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `          PERFORM return_stock_by_item(v_item.id, v_qty, p_admin_id);()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -1341,14 +1523,6 @@ CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id
 ```
 
 ### `        END IF;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `        PERFORM return_courier_stock_by_item(v_item.id, v_qty, p_admin_id, v_order.courier_id);()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7300,6 +7474,1054 @@ CREATE OR REPLACE FUNCTION public.register_outbound(p_product_id uuid, p_quantit
 
 ```
 
+### `register_swap_at_delivery(p_order_item_id uuid, p_swapped_product_id uuid, p_quantity integer, p_source text, p_courier_id uuid, p_admin_id uuid, p_order_reference uuid, p_notes text DEFAULT NULL::text)`
+- **Retorna**: TABLE(swap_id uuid, lot_id uuid, allocated_qty integer, unit_cost numeric)
+- **Seguridad**: SECURITY DEFINER
+
+```sql
+CREATE OR REPLACE FUNCTION public.register_swap_at_delivery(p_order_item_id uuid, p_swapped_product_id uuid, p_quantity integer, p_source text, p_courier_id uuid, p_admin_id uuid, p_order_reference uuid, p_notes text DEFAULT NULL::text)
+```
+
+### ` RETURNS TABLE(swap_id uuid, lot_id uuid, allocated_qty integer, unit_cost numeric)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` LANGUAGE plpgsql()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` SECURITY DEFINER()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `AS $function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `DECLARE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_swap_id      UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_remaining    INTEGER := p_quantity;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_lot          RECORD;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_consume      INTEGER;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_swapped_admin UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_movement_notes TEXT;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `BEGIN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_admin_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'admin_id es requerido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_courier_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'courier_id es requerido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_quantity <= 0 THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'La cantidad de cambio debe ser mayor a cero';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_source NOT IN ('central', 'courier_kit') THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Origen invalido (debe ser central o courier_kit): %', p_source;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  -- Validar que el producto sustituto pertenezca al mismo admin()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT admin_id INTO v_swapped_admin FROM products WHERE id = p_swapped_product_id FOR UPDATE;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_swapped_admin IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Producto sustituto no encontrado';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_swapped_admin IS DISTINCT FROM p_admin_id THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Producto sustituto no pertenece al admin';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  -- Insertar el swap antes de descontar (necesitamos el id para las allocations)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  INSERT INTO order_item_swaps (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    order_item_id, swapped_product_id, swapped_quantity, source,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    courier_id, admin_id, notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  ) VALUES (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    p_order_item_id, p_swapped_product_id, p_quantity, p_source,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    p_courier_id, p_admin_id, p_notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  ) RETURNING id INTO v_swap_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_movement_notes := COALESCE(p_notes, CASE WHEN p_source = 'central'()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    THEN 'Cambio en sitio (desde central)'()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    ELSE 'Cambio en sitio (desde stock movil)' END);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_source = 'central' THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    -- FIFO sobre product_lots (mismo patron que deduct_stock)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    FOR v_lot IN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SELECT pl.id, pl.quantity_remaining, pl.unit_cost AS uc()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FROM product_lots pl()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE pl.product_id = p_swapped_product_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND pl.quantity_remaining > 0()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND pl.active = TRUE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND (pl.expires_at IS NULL OR pl.expires_at > NOW())()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ORDER BY pl.received_at ASC, pl.id ASC()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FOR UPDATE OF pl()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    LOOP()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      EXIT WHEN v_remaining = 0;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_consume := LEAST(v_remaining, v_lot.quantity_remaining);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      UPDATE product_lots SET quantity_remaining = quantity_remaining - v_consume WHERE id = v_lot.id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      INSERT INTO inventory_movements (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        product_id, type, quantity, lot_id, unit_cost_snapshot,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        order_reference, order_item_id, admin_id, courier_id, notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ) VALUES (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        p_swapped_product_id, 'outbound', v_consume, v_lot.id, v_lot.uc,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        p_order_reference, NULL, p_admin_id, p_courier_id, v_movement_notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      );()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      INSERT INTO outbound_lot_allocations (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        order_item_id, lot_id, quantity, unit_cost_snapshot, admin_id, swap_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ) VALUES (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        NULL, v_lot.id, v_consume, v_lot.uc, p_admin_id, v_swap_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      );()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      swap_id := v_swap_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      lot_id := v_lot.id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      allocated_qty := v_consume;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      unit_cost := v_lot.uc;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      RETURN NEXT;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_remaining := v_remaining - v_consume;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END LOOP;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    IF v_remaining > 0 THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      RAISE EXCEPTION 'Stock central insuficiente para producto sustituto: faltan % unidades', v_remaining;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    UPDATE products SET stock = stock - p_quantity WHERE id = p_swapped_product_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  ELSE  -- courier_kit()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    PERFORM 1 FROM users WHERE id = p_courier_id FOR UPDATE;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    IF NOT FOUND THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      RAISE EXCEPTION 'Courier no encontrado';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    -- FIFO sobre courier_inventory (mismo patron que deduct_courier_stock)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    FOR v_lot IN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SELECT ci.lot_id AS id, ci.quantity_remaining, pl.unit_cost AS uc()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FROM courier_inventory ci()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      JOIN product_lots pl ON pl.id = ci.lot_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE ci.courier_id = p_courier_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND ci.product_id = p_swapped_product_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND ci.quantity_remaining > 0()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND pl.active = TRUE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        AND (pl.expires_at IS NULL OR pl.expires_at > NOW())()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ORDER BY pl.received_at ASC, pl.id ASC()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FOR UPDATE OF ci()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    LOOP()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      EXIT WHEN v_remaining = 0;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_consume := LEAST(v_remaining, v_lot.quantity_remaining);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      UPDATE courier_inventory()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SET quantity_remaining = quantity_remaining - v_consume()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE courier_id = p_courier_id AND lot_id = v_lot.id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      INSERT INTO inventory_movements (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        product_id, type, quantity, lot_id, unit_cost_snapshot,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        order_reference, order_item_id, admin_id, courier_id, notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ) VALUES (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        p_swapped_product_id, 'outbound', v_consume, v_lot.id, v_lot.uc,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        p_order_reference, NULL, p_admin_id, p_courier_id, v_movement_notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      );()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      INSERT INTO outbound_lot_allocations (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        order_item_id, lot_id, quantity, unit_cost_snapshot, admin_id, swap_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ) VALUES (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        NULL, v_lot.id, v_consume, v_lot.uc, p_admin_id, v_swap_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      );()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      swap_id := v_swap_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      lot_id := v_lot.id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      allocated_qty := v_consume;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      unit_cost := v_lot.uc;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      RETURN NEXT;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_remaining := v_remaining - v_consume;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END LOOP;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    IF v_remaining > 0 THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      RAISE EXCEPTION 'Stock movil del courier insuficiente para producto sustituto: faltan % unidades', v_remaining;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  RETURN;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `END;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `$function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
 ### `return_courier_stock_by_item(p_order_item_id uuid, p_quantity integer, p_admin_id uuid, p_courier_id uuid)`
 - **Retorna**: void
 - **Seguridad**: SECURITY DEFINER
@@ -7356,7 +8578,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `  v_alloc     RECORD;()`
+### `  v_alloc RECORD;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7364,7 +8586,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `  v_consume   INTEGER;()`
+### `  v_revert INTEGER;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7380,7 +8602,71 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
+### `  v_item_admin UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_order_id UUID;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
 ### `BEGIN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_admin_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'admin_id es requerido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_courier_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'courier_id es requerido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7412,7 +8698,23 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `  SELECT product_id INTO v_product_id FROM order_items WHERE id = p_order_item_id;()`
+### `  SELECT product_id, admin_id, order_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    INTO v_product_id, v_item_admin, v_order_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM order_items WHERE id = p_order_item_id;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7428,7 +8730,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    RAISE EXCEPTION 'order_item no encontrado';()`
+### `    RAISE EXCEPTION 'Order item no encontrado';()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7444,7 +8746,31 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `  -- LIFO sobre allocations()`
+### `  IF v_item_admin IS DISTINCT FROM p_admin_id THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Order item no pertenece al admin';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  PERFORM 1 FROM users WHERE id = p_courier_id FOR UPDATE;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7484,7 +8810,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    ORDER BY created_at DESC, id DESC()`
+### `      AND swap_id IS NULL()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7492,7 +8818,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    FOR UPDATE()`
+### `    ORDER BY created_at DESC, id DESC()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7516,7 +8842,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    v_consume := LEAST(v_remaining, v_alloc.quantity);()`
+### `    v_revert := LEAST(v_remaining, v_alloc.quantity);()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7524,7 +8850,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    -- Reducir o eliminar allocation()`
+### `    INSERT INTO courier_inventory (courier_id, product_id, lot_id, quantity_remaining, admin_id)()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7532,7 +8858,31 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    IF v_consume = v_alloc.quantity THEN()`
+### `    VALUES (p_courier_id, v_product_id, v_alloc.lot_id, v_revert, p_admin_id)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    ON CONFLICT (courier_id, lot_id)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      DO UPDATE SET quantity_remaining = courier_inventory.quantity_remaining + EXCLUDED.quantity_remaining;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    IF v_revert >= v_alloc.quantity THEN()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7564,7 +8914,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `      SET quantity = quantity - v_consume()`
+### `      SET quantity = quantity - v_revert()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7588,78 +8938,6 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    -- Restaurar a courier_inventory (no central)()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    INSERT INTO courier_inventory (()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `      courier_id, admin_id, product_id, lot_id, quantity_remaining()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    ) VALUES (()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `      p_courier_id, p_admin_id, v_product_id, v_alloc.lot_id, v_consume()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    )()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    ON CONFLICT (courier_id, lot_id) DO UPDATE()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `      SET quantity_remaining = courier_inventory.quantity_remaining + EXCLUDED.quantity_remaining;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `    -- Movement de retorno()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
 ### `    INSERT INTO inventory_movements (()`
 - **Retorna**: 
 - **Seguridad**: 
@@ -7676,7 +8954,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `      order_item_id, admin_id, courier_id, notes()`
+### `      order_reference, order_item_id, admin_id, courier_id, notes()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7692,7 +8970,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `      v_product_id, 'return', v_consume, v_alloc.lot_id, v_alloc.unit_cost_snapshot,()`
+### `      v_product_id, 'return', v_revert, v_alloc.lot_id, v_alloc.unit_cost_snapshot,()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7700,7 +8978,15 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `      p_order_item_id, p_admin_id, p_courier_id, 'Rollback de entrega'()`
+### `      v_order_id, p_order_item_id, p_admin_id, p_courier_id,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      'Devolucion al stock movil del courier via allocation'()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7716,7 +9002,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    v_remaining := v_remaining - v_consume;()`
+### `    v_remaining := v_remaining - v_revert;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -7740,7 +9026,7 @@ CREATE OR REPLACE FUNCTION public.return_courier_stock_by_item(p_order_item_id u
 
 ```
 
-### `    RAISE EXCEPTION 'No hay allocations suficientes para devolver: faltan % unidades', v_remaining;()`
+### `    RAISE EXCEPTION 'No hay allocations originales suficientes para devolver: faltan % unidades', v_remaining;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -9236,23 +10522,7 @@ CREATE OR REPLACE FUNCTION public.return_stock_by_item(p_order_item_id uuid, p_q
 
 ```
 
-### `  -- Lock product()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
 ### `  PERFORM 1 FROM products WHERE id = v_product_id FOR UPDATE;()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
-### `  -- LIFO sobre allocations()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -9285,6 +10555,14 @@ CREATE OR REPLACE FUNCTION public.return_stock_by_item(p_order_item_id uuid, p_q
 ```
 
 ### `    WHERE order_item_id = p_order_item_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      AND swap_id IS NULL()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -9492,6 +10770,14 @@ CREATE OR REPLACE FUNCTION public.return_stock_by_item(p_order_item_id uuid, p_q
 
 ```
 
+### `  UPDATE products SET stock = stock + v_total_returned WHERE id = v_product_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
 ### `  IF v_remaining > 0 THEN()`
 - **Retorna**: 
 - **Seguridad**: 
@@ -9500,7 +10786,7 @@ CREATE OR REPLACE FUNCTION public.return_stock_by_item(p_order_item_id uuid, p_q
 
 ```
 
-### `    RAISE EXCEPTION 'Asignaciones insuficientes para devolver: faltan % unidades', v_remaining;()`
+### `    RAISE EXCEPTION 'No hay allocations originales suficientes para devolver: faltan % unidades', v_remaining;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -9516,7 +10802,423 @@ CREATE OR REPLACE FUNCTION public.return_stock_by_item(p_order_item_id uuid, p_q
 
 ```
 
-### `  UPDATE products SET stock = stock + v_total_returned WHERE id = v_product_id;()`
+### `END;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `$function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `revert_swap(p_swap_id uuid, p_admin_id uuid)`
+- **Retorna**: void
+- **Seguridad**: SECURITY DEFINER
+
+```sql
+CREATE OR REPLACE FUNCTION public.revert_swap(p_swap_id uuid, p_admin_id uuid)
+```
+
+### ` RETURNS void()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` LANGUAGE plpgsql()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` SECURITY DEFINER()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `AS $function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `DECLARE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_swap RECORD;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_alloc RECORD;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `BEGIN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_admin_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'admin_id es requerido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT id, swapped_product_id, source, courier_id, admin_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    INTO v_swap()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM order_item_swaps()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = p_swap_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FOR UPDATE;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF NOT FOUND THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Swap no encontrado: %', p_swap_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_swap.admin_id IS DISTINCT FROM p_admin_id THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Swap no pertenece al admin';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FOR v_alloc IN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    SELECT id, lot_id, quantity, unit_cost_snapshot()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    FROM outbound_lot_allocations()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    WHERE swap_id = p_swap_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    ORDER BY created_at DESC, id DESC()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  LOOP()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    IF v_swap.source = 'central' THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      UPDATE product_lots()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SET quantity_remaining = quantity_remaining + v_alloc.quantity()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE id = v_alloc.lot_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      UPDATE products SET stock = stock + v_alloc.quantity WHERE id = v_swap.swapped_product_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    ELSE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      INSERT INTO courier_inventory (courier_id, product_id, lot_id, quantity_remaining, admin_id)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      VALUES (v_swap.courier_id, v_swap.swapped_product_id, v_alloc.lot_id, v_alloc.quantity, p_admin_id)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      ON CONFLICT (courier_id, lot_id)()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        DO UPDATE SET quantity_remaining = courier_inventory.quantity_remaining + EXCLUDED.quantity_remaining;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    INSERT INTO inventory_movements (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      product_id, type, quantity, lot_id, unit_cost_snapshot,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      order_reference, admin_id, courier_id, notes()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    ) VALUES (()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_swap.swapped_product_id, 'return', v_alloc.quantity, v_alloc.lot_id, v_alloc.unit_cost_snapshot,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      NULL, p_admin_id, v_swap.courier_id,()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      'Reversion de cambio en sitio'()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    );()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    DELETE FROM outbound_lot_allocations WHERE id = v_alloc.id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END LOOP;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  DELETE FROM order_item_swaps WHERE id = p_swap_id;()`
 - **Retorna**: 
 - **Seguridad**: 
 
@@ -13006,6 +14708,7 @@ CREATE OR REPLACE FUNCTION public.validate_courier_has_stock(p_courier_id uuid, 
 | customers | SI |
 | delivery_attempts | SI |
 | inventory_movements | SI |
+| order_item_swaps | SI |
 | order_items | SI |
 | orders | SI |
 | outbound_lot_allocations | SI |

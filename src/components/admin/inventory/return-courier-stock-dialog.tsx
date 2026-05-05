@@ -87,7 +87,7 @@ export function ReturnCourierStockDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">
-            Devolver desde bodega de {courierName}
+            Devolver stock móvil de {courierName} al central
           </DialogTitle>
         </DialogHeader>
 
@@ -99,7 +99,7 @@ export function ReturnCourierStockDialog({
           )}
 
           {detailedItems.length === 0 ? (
-            <p className="text-sm text-[#64748B]">El courier no tiene stock en su bodega.</p>
+            <p className="text-sm text-[#64748B]">El courier no tiene stock móvil cargado.</p>
           ) : (
             <div className="max-h-80 space-y-2 overflow-y-auto">
               {detailedItems.map((item) => (

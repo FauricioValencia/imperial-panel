@@ -30,7 +30,7 @@ export default async function InventoryPage() {
       <div>
         <h2 className="text-2xl font-bold text-[#1E293B]">Inventario</h2>
         <p className="text-sm text-[#64748B]">
-          Productos, lotes y bodegas de couriers
+          Productos, lotes y stock móvil de couriers
         </p>
       </div>
       <InventoryTabs

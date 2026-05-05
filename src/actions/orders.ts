@@ -488,14 +488,25 @@ export async function markInTransit(orderId: string): Promise<ActionResponse> {
   return { success: true };
 }
 
-// Courier: confirm delivery with optional returns
+// Courier: confirm delivery with optional returns and in-field swaps.
 // `attemptKey` provee idempotency: dos llamadas con el mismo key sobre la
 // misma orden son atendidas una sola vez (el UNIQUE en delivery_attempts
 // hace que el segundo INSERT falle y retornemos exito sin re-procesar).
+//
+// Los swaps representan cambios en sitio: el cliente acepto un producto
+// distinto al original. Se registran en order_item_swaps via RPC y descuentan
+// el sustituto del central o del stock movil del courier (FIFO).
 export async function confirmDelivery(
   orderId: string,
   returnedItems?: { order_item_id: string; returned_quantity: number }[],
-  attemptKey?: string
+  attemptKey?: string,
+  swaps?: {
+    order_item_id: string;
+    swapped_product_id: string;
+    swapped_quantity: number;
+    source: "central" | "courier_kit";
+    notes?: string;
+  }[]
 ): Promise<ActionResponse> {
   const ctx = await verifyAuth();
   if (!ctx || ctx.user.role !== "courier") {
@@ -505,6 +516,7 @@ export async function confirmDelivery(
   const validation = confirmDeliverySchema.safeParse({
     order_id: orderId,
     returned_items: returnedItems,
+    swaps,
   });
   if (!validation.success) {
     return { success: false, error: validation.error.issues[0].message };
@@ -539,10 +551,10 @@ export async function confirmDelivery(
     }
   }
 
-  // Get order items
+  // Get order items + flag legacy para decidir desde donde se descuenta el stock.
   const { data: order } = await ctx.supabase
     .from("orders")
-    .select("id, status, customer_id, items:order_items(id, product_id, quantity)")
+    .select("id, status, customer_id, legacy_courier_deduction, items:order_items(id, product_id, quantity)")
     .eq("id", orderId)
     .eq("courier_id", ctx.user.id)
     .single();
@@ -552,8 +564,14 @@ export async function confirmDelivery(
     return { success: false, error: "Order cannot be delivered in current status" };
   }
 
+  // Modelo nuevo (default): el stock del pedido sale del CENTRAL via deduct_stock.
+  // Modelo viejo (legacy_courier_deduction = true): el stock sale de courier_inventory
+  // porque la transferencia central->courier ya ocurrio cuando se asigno el pedido.
+  const useLegacyCourierDeduction = Boolean(order.legacy_courier_deduction);
+
   const items = order.items as { id: string; product_id: string; quantity: number }[];
   const hasReturns = returnedItems && returnedItems.length > 0;
+  const swapList = swaps ?? [];
 
   // Build a map of returned quantities per order_item_id
   const returnMap = new Map<string, number>();
@@ -563,9 +581,17 @@ export async function confirmDelivery(
     }
   }
 
+  // Acumular cantidades de swap por order_item_id. Un mismo item puede tener
+  // varios swaps (ej: 2 unidades por producto A y 1 por producto B).
+  const swapByItem = new Map<string, number>();
+  for (const s of swapList) {
+    swapByItem.set(s.order_item_id, (swapByItem.get(s.order_item_id) ?? 0) + s.swapped_quantity);
+  }
+
   // Server-side validation: cada returned_quantity debe corresponder a un
   // order_item de esta orden y no exceder su quantity. El cliente ya valida
   // pero un payload manipulado podria causar stock negativo o datos corruptos.
+  // Adicional: returned + swap <= quantity (no se puede entregar mas de lo pedido).
   const itemIds = new Set(items.map((i) => i.id));
   for (const [orderItemId, qty] of returnMap.entries()) {
     if (!itemIds.has(orderItemId)) {
@@ -590,59 +616,108 @@ export async function confirmDelivery(
     }
   }
 
-  // Descontar stock SOLO de la bodega del courier (no central).
-  // deduct_courier_stock usa FIFO sobre courier_inventory y registra
-  // outbound_lot_allocations apuntando al lote original (preserva COGS).
-  // Rollback con return_courier_stock_by_item devuelve a courier_inventory.
-  let allReturned = true;
+  for (const s of swapList) {
+    if (!itemIds.has(s.order_item_id)) {
+      return { success: false, error: "Item de cambio no pertenece a la orden" };
+    }
+    const item = items.find((i) => i.id === s.order_item_id)!;
+    const returnedQty = returnMap.get(s.order_item_id) ?? 0;
+    const swapTotal = swapByItem.get(s.order_item_id) ?? 0;
+    if (returnedQty + swapTotal > item.quantity) {
+      return {
+        success: false,
+        error: `Devolucion + cambios (${returnedQty + swapTotal}) excede la cantidad del pedido (${item.quantity})`,
+      };
+    }
+    if (s.swapped_product_id === item.product_id) {
+      return {
+        success: false,
+        error: "El producto de cambio debe ser distinto al del pedido original",
+      };
+    }
+  }
+
+  // Descontar stock segun el flag legacy:
+  //  - Flujo nuevo: deduct_stock FIFO sobre product_lots (central). Rollback con
+  //    return_stock_by_item LIFO al central.
+  //  - Flujo legacy: deduct_courier_stock FIFO sobre courier_inventory.
+  // Ambos RPCs registran outbound_lot_allocations con lot_id real, asi reportes
+  // de COGS funcionan identico. Los swaps van a register_swap_at_delivery y se
+  // revierten por separado con revert_swap.
+  let anythingDelivered = false;
   const deductedItems: { order_item_id: string; quantity: number }[] = [];
-  // Allocations consumidas por lote (para audit log). Cada entrada captura
-  // que lote suministro cuanto y a que costo unitario, permitiendo trazar
-  // COGS por entrega sin depender de la vista lot_profitability_view.
+  const registeredSwaps: string[] = [];
   const allocationsLog: {
-    order_item_id: string;
+    order_item_id: string | null;
     product_id: string;
     lot_id: string;
     allocated_qty: number;
     unit_cost: number;
+    swap_id?: string;
   }[] = [];
+
+  const rollbackAll = async () => {
+    for (const swapId of [...registeredSwaps].reverse()) {
+      await ctx.supabase.rpc("revert_swap", {
+        p_swap_id: swapId,
+        p_admin_id: courierAdminId,
+      });
+    }
+    for (const deducted of [...deductedItems].reverse()) {
+      if (useLegacyCourierDeduction) {
+        await ctx.supabase.rpc("return_courier_stock_by_item", {
+          p_order_item_id: deducted.order_item_id,
+          p_quantity: deducted.quantity,
+          p_admin_id: courierAdminId,
+          p_courier_id: ctx.user.id,
+        });
+      } else {
+        await ctx.supabase.rpc("return_stock_by_item", {
+          p_order_item_id: deducted.order_item_id,
+          p_quantity: deducted.quantity,
+          p_admin_id: courierAdminId,
+        });
+      }
+    }
+  };
 
   for (const item of items) {
     const returnedQty = returnMap.get(item.id) ?? 0;
-    const deliveredQty = item.quantity - returnedQty;
+    const swappedQty = swapByItem.get(item.id) ?? 0;
+    // Cantidad del producto ORIGINAL que se entrega (no devuelta y no cambiada).
+    const originalDeliveredQty = item.quantity - returnedQty - swappedQty;
 
-    if (deliveredQty > 0) {
-      allReturned = false;
+    if (originalDeliveredQty > 0) {
+      anythingDelivered = true;
 
-      const { data: allocations, error: stockError } = await ctx.supabase.rpc("deduct_courier_stock", {
-        p_courier_id: ctx.user.id,
-        p_admin_id: courierAdminId,
-        p_product_id: item.product_id,
-        p_quantity: deliveredQty,
-        p_order_item_id: item.id,
-        p_order_reference: orderId,
-        p_notes: null,
-      });
+      const { data: allocations, error: stockError } = useLegacyCourierDeduction
+        ? await ctx.supabase.rpc("deduct_courier_stock", {
+            p_courier_id: ctx.user.id,
+            p_admin_id: courierAdminId,
+            p_product_id: item.product_id,
+            p_quantity: originalDeliveredQty,
+            p_order_item_id: item.id,
+            p_order_reference: orderId,
+            p_notes: null,
+          })
+        : await ctx.supabase.rpc("deduct_stock", {
+            p_product_id: item.product_id,
+            p_quantity: originalDeliveredQty,
+            p_admin_id: courierAdminId,
+            p_order_item_id: item.id,
+            p_order_reference: orderId,
+            p_notes: null,
+          });
 
       if (stockError) {
-        // Rollback de items previos LIFO sobre courier_inventory
-        for (const deducted of deductedItems) {
-          await ctx.supabase.rpc("return_courier_stock_by_item", {
-            p_order_item_id: deducted.order_item_id,
-            p_quantity: deducted.quantity,
-            p_admin_id: courierAdminId,
-            p_courier_id: ctx.user.id,
-          });
-        }
-        logError("confirm_delivery_stock", stockError, { order_id: orderId });
+        await rollbackAll();
+        logError("confirm_delivery_stock", stockError, { order_id: orderId, legacy: useLegacyCourierDeduction });
         return {
           success: false,
-          error: stockError.message ?? "Stock insuficiente en tu bodega",
+          error: stockError.message ?? "Stock insuficiente",
         };
       }
 
-      // deduct_stock RETURNS TABLE(lot_id, allocated_qty, unit_cost): puede
-      // ser multi-fila si el FIFO consumio de varios lotes.
       if (Array.isArray(allocations)) {
         for (const a of allocations as { lot_id: string; allocated_qty: number; unit_cost: number }[]) {
           allocationsLog.push({
@@ -655,7 +730,49 @@ export async function confirmDelivery(
         }
       }
 
-      deductedItems.push({ order_item_id: item.id, quantity: deliveredQty });
+      deductedItems.push({ order_item_id: item.id, quantity: originalDeliveredQty });
+    }
+
+    // Registrar swaps de este item (puede haber varios).
+    for (const s of swapList.filter((sw) => sw.order_item_id === item.id)) {
+      anythingDelivered = true;
+      const { data: swapAllocs, error: swapError } = await ctx.supabase.rpc(
+        "register_swap_at_delivery",
+        {
+          p_order_item_id: s.order_item_id,
+          p_swapped_product_id: s.swapped_product_id,
+          p_quantity: s.swapped_quantity,
+          p_source: s.source,
+          p_courier_id: ctx.user.id,
+          p_admin_id: courierAdminId,
+          p_order_reference: orderId,
+          p_notes: s.notes ?? null,
+        }
+      );
+
+      if (swapError) {
+        await rollbackAll();
+        logError("confirm_delivery_swap", swapError, { order_id: orderId, swap: s });
+        return {
+          success: false,
+          error: swapError.message ?? "Error al registrar cambio en sitio",
+        };
+      }
+
+      if (Array.isArray(swapAllocs) && swapAllocs.length > 0) {
+        const swapId = (swapAllocs[0] as { swap_id: string }).swap_id;
+        registeredSwaps.push(swapId);
+        for (const a of swapAllocs as { swap_id: string; lot_id: string; allocated_qty: number; unit_cost: number }[]) {
+          allocationsLog.push({
+            order_item_id: null,
+            product_id: s.swapped_product_id,
+            lot_id: a.lot_id,
+            allocated_qty: a.allocated_qty,
+            unit_cost: a.unit_cost,
+            swap_id: a.swap_id,
+          });
+        }
+      }
     }
 
     // Update order item if it has returns
@@ -673,9 +790,9 @@ export async function confirmDelivery(
         return { success: false, error: "Error al actualizar items" };
       }
 
-      // Movement de devolucion del cliente. Las unidades devueltas siguen
-      // fisicamente con el courier (no se descontaron de su bodega), pero
-      // queda el rastro en el historial para reconciliacion al cierre de turno.
+      // Movement de devolucion del cliente para auditoria. En el flujo nuevo
+      // las unidades devueltas nunca salieron del central, asi que es solo
+      // un rastro informativo. En el flujo legacy queda con el courier.
       const { error: returnMoveError } = await ctx.supabase
         .from("inventory_movements")
         .insert({
@@ -685,8 +802,10 @@ export async function confirmDelivery(
           order_reference: orderId,
           order_item_id: item.id,
           admin_id: courierAdminId,
-          courier_id: ctx.user.id,
-          notes: "Devolucion del cliente",
+          courier_id: useLegacyCourierDeduction ? ctx.user.id : null,
+          notes: useLegacyCourierDeduction
+            ? "Devolucion del cliente"
+            : "Devolucion del cliente — items no salieron del central",
         });
       if (returnMoveError) {
         logError("confirm_delivery_return_movement", returnMoveError, { order_id: orderId });
@@ -695,7 +814,10 @@ export async function confirmDelivery(
   }
 
   // Determine final status
-  const finalStatus = allReturned ? "returned" : hasReturns ? "partial" : "delivered";
+  // returned: nada salio para el cliente (ni original ni swap).
+  // partial: hubo entregas pero tambien returns.
+  // delivered: caso normal (incluye casos donde todo fue swap pero el cliente recibio algo).
+  const finalStatus = !anythingDelivered ? "returned" : hasReturns ? "partial" : "delivered";
 
   const { error: statusError } = await ctx.supabase
     .from("orders")

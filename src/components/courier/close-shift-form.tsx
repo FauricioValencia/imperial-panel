@@ -50,7 +50,7 @@ export function CloseShiftForm() {
       const linesByLot: { lot_id: string; product_id: string; quantity: number }[] = [];
       const detailRes = await getMyInventoryDetailed();
       if (!detailRes.success || !detailRes.data) {
-        setError("Error al obtener detalle de bodega");
+        setError("Error al obtener detalle del stock móvil");
         return;
       }
       const detail = detailRes.data;
@@ -109,7 +109,7 @@ export function CloseShiftForm() {
         <CheckCircle2 className="mx-auto mb-2 h-10 w-10 text-[#047857]" />
         <p className="font-semibold text-[#065F46]">Turno cerrado</p>
         <p className="mt-1 text-sm text-[#047857]">
-          La caja y la bodega quedaron registradas.
+          La caja y el stock móvil quedaron registrados.
         </p>
         <Button
           type="button"
@@ -154,10 +154,10 @@ export function CloseShiftForm() {
 
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <p className="mb-3 text-sm font-semibold text-[#1E293B]">
-          Devolver a bodega central
+          Devolver stock móvil al central
         </p>
         {items.length === 0 ? (
-          <p className="text-sm text-[#64748B]">No tienes stock en bodega.</p>
+          <p className="text-sm text-[#64748B]">No tienes stock móvil cargado.</p>
         ) : (
           <div className="space-y-2">
             {items.map((item) => (

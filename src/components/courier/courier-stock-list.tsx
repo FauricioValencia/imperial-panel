@@ -21,9 +21,9 @@ export function CourierStockList({ items, expiringSoonCount }: Props) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
         <Package className="mx-auto mb-3 h-10 w-10 text-[#94A3B8]" />
-        <p className="text-sm text-[#64748B]">Tu bodega esta vacia.</p>
+        <p className="text-sm text-[#64748B]">Tu stock móvil esta vacio.</p>
         <p className="mt-1 text-xs text-[#94A3B8]">
-          Pidele al admin que te transfiera productos.
+          Pidele al admin que cargue productos para cambios en sitio.
         </p>
       </div>
     );

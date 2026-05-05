@@ -11,7 +11,7 @@ const titles: Record<string, string> = {
   "/route": "Mi Ruta",
   "/history": "Historial",
   "/profile": "Mi Perfil",
-  "/warehouse": "Mi Bodega",
+  "/warehouse": "Mi Stock Móvil",
 };
 
 export function CourierHeader({ user }: { user: User }) {
@@ -32,7 +32,7 @@ export function CourierHeader({ user }: { user: User }) {
           <Link
             href="/warehouse"
             className="rounded-md p-1.5 text-white/80 hover:bg-white/10 hover:text-white"
-            aria-label="Mi bodega"
+            aria-label="Mi stock móvil"
           >
             <Warehouse className="h-4 w-4" />
           </Link>

@@ -12,7 +12,7 @@ export default async function CourierWarehousePage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-[#1E293B]">Mi Bodega</h2>
+      <h2 className="text-xl font-bold text-[#1E293B]">Mi Stock Móvil</h2>
       <CourierWarehouseTabs
         initialInventory={inventoryResult.data ?? []}
         initialMovements={movementsResult.data ?? []}

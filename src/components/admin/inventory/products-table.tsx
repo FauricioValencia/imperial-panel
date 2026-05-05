@@ -284,7 +284,20 @@ export function ProductsTable({ initialProducts, customers = [] }: ProductsTable
                   <TableHead className="text-right">Valor inv.</TableHead>
                 </>
               )}
-              <TableHead className="text-center">Stock</TableHead>
+              <TableHead className="text-center">
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help">Stock Central</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      No incluye unidades en stock móvil de couriers.
+                      <br />
+                      Ver pestaña «Stock móvil» para detalle por courier.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TableHead>
               <TableHead className="w-[160px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>

@@ -100,7 +100,7 @@ export function TransferStockDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-[#1E293B]">
-            Transferir stock a {courierName}
+            Cargar stock móvil de {courierName}
           </DialogTitle>
         </DialogHeader>
 

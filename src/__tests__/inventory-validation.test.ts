@@ -3,8 +3,10 @@ import {
   aggregateRequiredByProduct,
   computeStockShortages,
   formatShortageError,
+  getDeliveryBreakdown,
   type InventoryGlobalRow,
 } from "@/lib/inventory-validation";
+import { confirmDeliverySchema } from "@/types";
 
 describe("aggregateRequiredByProduct", () => {
   it("suma cantidades de items duplicados del mismo producto", () => {
@@ -112,5 +114,106 @@ describe("formatShortageError", () => {
     ]);
     expect(msg).toContain("Mango");
     expect(msg).toContain("(y 2 mas)");
+  });
+});
+
+describe("getDeliveryBreakdown", () => {
+  it("entrega completa sin returns ni swaps", () => {
+    const r = getDeliveryBreakdown(5, 0, 0);
+    expect(r).toEqual({ deliveredQty: 5, originalDelivered: 5 });
+  });
+
+  it("devolucion parcial sin swap", () => {
+    const r = getDeliveryBreakdown(5, 2, 0);
+    expect(r).toEqual({ deliveredQty: 3, originalDelivered: 3 });
+  });
+
+  it("swap reduce el original entregado pero no el delivered total", () => {
+    // 5 pedidos, 0 devueltos, 2 swapped -> 3 originales + 2 cambios = 5 total
+    const r = getDeliveryBreakdown(5, 0, 2);
+    expect(r).toEqual({ deliveredQty: 5, originalDelivered: 3 });
+  });
+
+  it("combinacion de return + swap", () => {
+    // 5 pedidos, 1 devuelto, 2 swapped -> 1 original + 2 cambios = 3 entregados, 1 devuelto
+    const r = getDeliveryBreakdown(5, 1, 2);
+    expect(r).toEqual({ deliveredQty: 4, originalDelivered: 2 });
+  });
+
+  it("originalDelivered no puede ser negativo aunque swap exceda", () => {
+    const r = getDeliveryBreakdown(5, 0, 10);
+    expect(r.originalDelivered).toBe(0);
+  });
+});
+
+describe("confirmDeliverySchema (swaps)", () => {
+  // Zod v4 valida formato UUID con version >= 1; usar UUIDs v4 reales.
+  const baseOrderId = "11111111-1111-4111-8111-111111111111";
+  const itemId = "22222222-2222-4222-8222-222222222222";
+  const productId = "33333333-3333-4333-8333-333333333333";
+
+  it("acepta payload sin swaps ni returns", () => {
+    const r = confirmDeliverySchema.safeParse({ order_id: baseOrderId });
+    expect(r.success).toBe(true);
+  });
+
+  it("acepta swap valido", () => {
+    const r = confirmDeliverySchema.safeParse({
+      order_id: baseOrderId,
+      swaps: [
+        {
+          order_item_id: itemId,
+          swapped_product_id: productId,
+          swapped_quantity: 2,
+          source: "courier_kit",
+        },
+      ],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rechaza source invalido", () => {
+    const r = confirmDeliverySchema.safeParse({
+      order_id: baseOrderId,
+      swaps: [
+        {
+          order_item_id: itemId,
+          swapped_product_id: productId,
+          swapped_quantity: 2,
+          source: "warehouse",
+        },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rechaza swapped_quantity 0 o negativo", () => {
+    const r = confirmDeliverySchema.safeParse({
+      order_id: baseOrderId,
+      swaps: [
+        {
+          order_item_id: itemId,
+          swapped_product_id: productId,
+          swapped_quantity: 0,
+          source: "courier_kit",
+        },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("acepta source central", () => {
+    const r = confirmDeliverySchema.safeParse({
+      order_id: baseOrderId,
+      swaps: [
+        {
+          order_item_id: itemId,
+          swapped_product_id: productId,
+          swapped_quantity: 1,
+          source: "central",
+        },
+      ],
+    });
+    expect(r.success).toBe(true);
   });
 });

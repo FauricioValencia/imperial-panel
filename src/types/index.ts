@@ -301,7 +301,26 @@ export const confirmDeliverySchema = z.object({
       })
     )
     .optional(),
+  swaps: z
+    .array(
+      z.object({
+        order_item_id: z.string().uuid(),
+        swapped_product_id: z.string().uuid(),
+        swapped_quantity: z.number().int().positive(),
+        source: z.enum(["central", "courier_kit"]),
+        notes: z.string().max(500).optional(),
+      })
+    )
+    .optional(),
 });
+
+export interface ConfirmDeliverySwapInput {
+  order_item_id: string;
+  swapped_product_id: string;
+  swapped_quantity: number;
+  source: "central" | "courier_kit";
+  notes?: string;
+}
 
 export const courierSchema = z.object({
   name: z.string().min(2, "Nombre requerido"),

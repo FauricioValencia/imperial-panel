@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Package, Layers, Clock, Users } from "lucide-react";
+import { Package, Layers, Clock, Truck } from "lucide-react";
 import { ProductsTable } from "./products-table";
 import { LotsTable } from "./lots-table";
 import { ExpiringLots } from "./expiring-lots";
@@ -48,7 +48,7 @@ export function InventoryTabs({
     { id: "products", label: "Productos", icon: Package },
     { id: "lots", label: "Lotes", icon: Layers },
     { id: "expiring", label: "Por vencer", icon: Clock, badge: criticalCount || undefined },
-    { id: "couriers", label: "Couriers", icon: Users },
+    { id: "couriers", label: "Stock móvil", icon: Truck },
   ];
 
   return (

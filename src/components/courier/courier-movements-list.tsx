@@ -39,7 +39,7 @@ export function CourierMovementsList({ movements }: { movements: MovementRow[] }
   if (movements.length === 0) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-[#64748B]">
-        Aun no hay movimientos en tu bodega.
+        Aun no hay movimientos en tu stock móvil.
       </div>
     );
   }

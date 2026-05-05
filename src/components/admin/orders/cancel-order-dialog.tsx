@@ -62,9 +62,9 @@ export function CancelOrderDialog({
         <DialogHeader>
           <DialogTitle>Cancelar pedido</DialogTitle>
           <DialogDescription className="text-left text-[#64748B]">
-            {orderLabel}. Se revertirá el inventario según el tipo de pedido (bodega central o bodega
-            del domiciliario), se eliminarán los pagos registrados para este pedido y se actualizará
-            la cartera del cliente. Esta acción no se puede deshacer.
+            {orderLabel}. Se revertirá el inventario según el tipo de pedido (bodega central o stock
+            móvil del domiciliario), se eliminarán los pagos registrados para este pedido y se
+            actualizará la cartera del cliente. Esta acción no se puede deshacer.
           </DialogDescription>
         </DialogHeader>
         {error && (

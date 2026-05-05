@@ -212,7 +212,7 @@ export function CourierWarehousePanel({
                   <div className="border-t border-slate-200 bg-slate-50 p-4">
                     {inventory.length === 0 ? (
                       <p className="text-sm text-[#64748B]">
-                        Sin stock en bodega.
+                        Sin stock móvil cargado.
                       </p>
                     ) : (
                       <table className="w-full text-sm">

@@ -55,3 +55,22 @@ export function formatShortageError(shortages: readonly CourierStockShortage[]):
   const extra = shortages.length > 1 ? ` (y ${shortages.length - 1} mas)` : "";
   return `Stock global insuficiente para ${first.product_name}: ${first.available} disponible (central + couriers), faltan ${first.shortfall}${extra}.`;
 }
+
+/**
+ * Calcula el desglose de un item de pedido en confirmacion de entrega:
+ *  - returnedQty: lo que el cliente rechazo
+ *  - swappedQty: lo que se reemplazo por otro producto en sitio
+ *  - originalDelivered: lo que el cliente recibio del producto original
+ *
+ * El cliente paga por la cantidad pedida (returnedQty se descuenta del total),
+ * y los swaps son intercambios 1:1 al precio original.
+ */
+export function getDeliveryBreakdown(
+  itemQuantity: number,
+  returnedQty: number,
+  swappedQty: number
+): { originalDelivered: number; deliveredQty: number } {
+  const deliveredQty = itemQuantity - returnedQty;
+  const originalDelivered = Math.max(0, deliveredQty - swappedQty);
+  return { originalDelivered, deliveredQty };
+}
