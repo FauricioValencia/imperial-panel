@@ -1,17 +1,17 @@
 "use client";
 
-import { Check, Copy, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 interface CopyableFieldProps {
-  icon: LucideIcon;
+  icon: ReactNode;
   label: string;
   value: string;
   copyValue?: string;
 }
 
-export function CopyableField({ icon: Icon, label, value, copyValue }: CopyableFieldProps) {
+export function CopyableField({ icon, label, value, copyValue }: CopyableFieldProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -27,7 +27,7 @@ export function CopyableField({ icon: Icon, label, value, copyValue }: CopyableF
 
   return (
     <div className="flex items-center gap-3 text-sm text-[#64748B]">
-      <Icon className="h-4 w-4 shrink-0" />
+      <span className="shrink-0">{icon}</span>
       <span className="flex-1 truncate">{value}</span>
       <button
         type="button"

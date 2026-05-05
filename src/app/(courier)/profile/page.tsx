@@ -32,12 +32,12 @@ export default async function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-2">
           <CopyableField
-            icon={Mail}
+            icon={<Mail className="h-4 w-4" />}
             label="Correo"
             value={user.email}
           />
           <CopyableField
-            icon={User}
+            icon={<User className="h-4 w-4" />}
             label="ID"
             value={`ID: ${user.id.slice(0, 8)}`}
             copyValue={user.id}
