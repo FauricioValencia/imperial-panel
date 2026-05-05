@@ -13,6 +13,7 @@ const STATUS_LABEL: Record<Order["status"], string> = {
   delivered: "Entregado",
   returned: "Devuelto",
   partial: "Parcial",
+  cancelled: "Cancelado",
 };
 
 const STATUS_CLASS: Record<Order["status"], string> = {
@@ -22,6 +23,7 @@ const STATUS_CLASS: Record<Order["status"], string> = {
   delivered: "bg-emerald-100 text-emerald-700",
   returned: "bg-red-100 text-red-700",
   partial: "bg-orange-100 text-orange-700",
+  cancelled: "bg-rose-100 text-rose-700",
 };
 
 async function updateContact(formData: FormData): Promise<void> {
