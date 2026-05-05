@@ -12,8 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { AssignCourierDialog } from "@/components/admin/orders/assign-courier-dialog";
 import { OrderDetailActions } from "@/components/admin/orders/order-detail-actions";
 import { formatCurrency } from "@/lib/format";
 
@@ -24,6 +22,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   delivered: { label: "Entregado", color: "bg-emerald-100 text-emerald-700" },
   returned: { label: "Devuelto", color: "bg-red-100 text-red-700" },
   partial: { label: "Parcial", color: "bg-orange-100 text-orange-700" },
+  cancelled: { label: "Cancelado", color: "bg-zinc-200 text-zinc-800" },
 };
 
 function formatDate(date: string): string {

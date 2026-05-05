@@ -26,6 +26,20 @@ export function parseFormattedNumber(value: string): number {
 }
 
 /**
+ * Entrada de precio en pesos (enteros): solo dígitos; muestra miles con `formatNumber` (es-CO).
+ */
+export function formatCOPIntegerInput(raw: string, max = 50_000_000): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  let n = Number(digits);
+  if (!Number.isFinite(n) || n < 0) return "";
+  if (n > max) {
+    n = max;
+  }
+  return numberFormatter.format(n);
+}
+
+/**
  * Muestra miles separados por coma mientras se escribe (ej. 4,000.50).
  * Acepta punto como separador decimal (hasta 2 cifras).
  */

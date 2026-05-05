@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatCOPIntegerInput, formatNumber, parseFormattedNumber } from "@/lib/format";
 
 const MAX_UNIT_PRICE = 50_000_000;
 const PRICE_EPS = 0.005;
@@ -35,10 +35,9 @@ interface OrderItemsSummaryProps {
 }
 
 function parseCommittedUnitPrice(text: string, fallback: number): number {
-  const normalized = text.trim().replace(",", ".");
-  const v = Number(normalized);
-  if (!Number.isFinite(v) || v <= 0) return fallback;
-  const rounded = Math.round(v * 100) / 100;
+  const n = parseFormattedNumber(text);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  const rounded = Math.round(n * 100) / 100;
   return Math.min(rounded, MAX_UNIT_PRICE);
 }
 
@@ -57,41 +56,46 @@ function UnitPriceField({
 }) {
   const baseId = useId();
   const inputId = `${baseId}-price-${productId}`;
-  const [text, setText] = useState(() => String(unitPrice));
+  const [text, setText] = useState(() => formatNumber(unitPrice));
 
   useEffect(() => {
-    setText(String(unitPrice));
+    setText(formatNumber(unitPrice));
   }, [unitPrice]);
 
-  const showSuggested =
+  const differsFromReference =
     suggestedPrice !== undefined && Math.abs(unitPrice - suggestedPrice) >= PRICE_EPS;
 
   return (
-    <div className="space-y-1">
+    <div className="w-full min-w-0 space-y-1">
       <Label htmlFor={inputId} className="sr-only">
         Precio unitario de {productName}
       </Label>
       <Input
         id={inputId}
         type="text"
-        inputMode="decimal"
+        inputMode="numeric"
         autoComplete="off"
-        className="h-8 min-w-0 text-right tabular-nums"
+        className="h-8 w-full min-w-0 text-right tabular-nums"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => setText(formatCOPIntegerInput(e.target.value, MAX_UNIT_PRICE))}
         onBlur={() => {
           const next = parseCommittedUnitPrice(text, unitPrice);
-          setText(String(next));
+          setText(formatNumber(next));
           if (next !== unitPrice) onCommit(next);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
       />
-      {showSuggested && (
-        <p className="text-[11px] leading-tight text-[#64748B]">
-          Referencia: {formatCurrency(suggestedPrice)}
-        </p>
+      {differsFromReference && (
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 flex-1 text-[11px] leading-tight text-[#64748B]">
+            Referencia: {formatCurrency(suggestedPrice)}
+          </p>
+          <span className="shrink-0 whitespace-nowrap rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+            Distinto a referencia
+          </span>
+        </div>
       )}
     </div>
   );
@@ -113,8 +117,6 @@ export function OrderItemsSummary({
         {items.map((item) => {
           const subtotal = item.quantity * item.unit_price;
           const suggested = suggestedPriceByProductId?.[item.product_id];
-          const modified =
-            suggested !== undefined && Math.abs(item.unit_price - suggested) >= PRICE_EPS;
 
           return (
             <li key={item.product_id} className="p-3">
@@ -139,22 +141,15 @@ export function OrderItemsSummary({
                   </div>
                 </div>
                 {canEdit ? (
-                  <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-2">
-                    <div className="min-w-28 flex-1">
-                      <p className="mb-1 text-xs font-medium text-[#64748B]">Precio c/u</p>
-                      <UnitPriceField
-                        productId={item.product_id}
-                        productName={item.product_name}
-                        unitPrice={item.unit_price}
-                        suggestedPrice={suggested}
-                        onCommit={(v) => onChangeUnitPrice!(item.product_id, v)}
-                      />
-                    </div>
-                    {modified && (
-                      <span className="mb-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-                        Distinto a referencia
-                      </span>
-                    )}
+                  <div className="w-full min-w-0 border-t border-slate-100 pt-2">
+                    <p className="mb-1 text-xs font-medium text-[#64748B]">Precio c/u</p>
+                    <UnitPriceField
+                      productId={item.product_id}
+                      productName={item.product_name}
+                      unitPrice={item.unit_price}
+                      suggestedPrice={suggested}
+                      onCommit={(v) => onChangeUnitPrice!(item.product_id, v)}
+                    />
                   </div>
                 ) : (
                   <p className="text-xs text-[#64748B]">
@@ -187,20 +182,11 @@ export function OrderItemsSummary({
           <TableBody>
             {items.map((item) => {
               const suggested = suggestedPriceByProductId?.[item.product_id];
-              const modified =
-                suggested !== undefined && Math.abs(item.unit_price - suggested) >= PRICE_EPS;
 
               return (
                 <TableRow key={item.product_id}>
                   <TableCell className="min-w-0 font-medium wrap-break-word text-[#1E293B]">
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span>{item.product_name}</span>
-                      {canEdit && modified && (
-                        <span className="w-fit rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-                          Distinto a referencia
-                        </span>
-                      )}
-                    </div>
+                    {item.product_name}
                   </TableCell>
                   <TableCell className="text-center tabular-nums">{item.quantity}</TableCell>
                   <TableCell className="text-right align-top">

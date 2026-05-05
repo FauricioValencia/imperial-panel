@@ -14,6 +14,7 @@ export const ORDER_STATUS = [
   "delivered",
   "returned",
   "partial",
+  "cancelled",
 ] as const;
 export const ORDER_TYPE = ["delivery", "direct"] as const;
 export const PAYMENT_TYPE = ["full", "partial"] as const;
@@ -253,6 +254,11 @@ export const assignCourierSchema = z.object({
   courier_id: z.string().uuid(),
 });
 
+export const cancelOrderSchema = z.object({
+  order_id: z.string().uuid(),
+  reason: z.string().max(500).optional(),
+});
+
 export const registerPaymentSchema = z.object({
   order_id: z.string().uuid(),
   amount: z.number().positive("Amount must be positive"),
@@ -439,6 +445,7 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CreateDirectSaleInput = z.infer<typeof createDirectSaleSchema>;
 export type UpsertCustomerPriceInput = z.infer<typeof upsertCustomerPriceSchema>;
 export type AssignCourierInput = z.infer<typeof assignCourierSchema>;
+export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
 export type RegisterPaymentInput = z.infer<typeof registerPaymentSchema>;
 export type AddManualChargeInput = z.infer<typeof addManualChargeSchema>;
 export type CancelManualChargeInput = z.infer<typeof cancelManualChargeSchema>;

@@ -32,6 +32,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   delivered: { label: "Entregado", color: "bg-emerald-100 text-emerald-700" },
   returned: { label: "Devuelto", color: "bg-red-100 text-red-700" },
   partial: { label: "Parcial", color: "bg-orange-100 text-orange-700" },
+  cancelled: { label: "Cancelado", color: "bg-zinc-200 text-zinc-800" },
 };
 
 function formatDate(date: string): string {
@@ -89,6 +90,7 @@ export function OrdersTable({ initialOrders, couriers }: OrdersTableProps) {
               <SelectItem value="delivered">Entregado</SelectItem>
               <SelectItem value="returned">Devuelto</SelectItem>
               <SelectItem value="partial">Parcial</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
             </SelectContent>
           </Select>
         </div>

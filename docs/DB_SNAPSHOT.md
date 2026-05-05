@@ -1,6 +1,6 @@
 # DB Snapshot - Imperial Apps
 
-> Generado automaticamente el 2026-05-04 17:11:14
+> Generado automaticamente el 2026-05-04 21:58:20
 > **NO editar manualmente.** Ejecutar `./scripts/db-snapshot.sh` para regenerar.
 
 ---
@@ -633,7 +633,7 @@ UNION ALL
 | orders | 2200_17535_4_not_null | CHECK |  |
 | orders | 2200_17535_5_not_null | CHECK |  |
 | orders | orders_order_type_check | CHECK | CHECK ((order_type = ANY (ARRAY['delivery'::text, 'direct'::text]))) |
-| orders | orders_status_check | CHECK | CHECK ((status = ANY (ARRAY['pending'::text, 'assigned'::text, 'in_transit'::text, 'delivered'::text, 'returned'::text, 'partial'::text]))) |
+| orders | orders_status_check | CHECK | CHECK ((status = ANY (ARRAY['pending'::text, 'assigned'::text, 'in_transit'::text, 'delivered'::text, 'returned'::text, 'partial'::text, 'cancelled'::text]))) |
 | orders | orders_admin_id_fkey | FOREIGN KEY |  |
 | orders | pedidos_cliente_id_fkey | FOREIGN KEY | customer_id -> customers(id) |
 | orders | pedidos_mensajero_id_fkey | FOREIGN KEY | courier_id -> users(id) |
@@ -923,6 +923,542 @@ UNION ALL
 ---
 
 ## Funciones
+
+### `admin_cancel_order(p_order_id uuid, p_admin_id uuid, p_reason text DEFAULT NULL::text)`
+- **Retorna**: void
+- **Seguridad**: SECURITY DEFINER
+
+```sql
+CREATE OR REPLACE FUNCTION public.admin_cancel_order(p_order_id uuid, p_admin_id uuid, p_reason text DEFAULT NULL::text)
+```
+
+### ` RETURNS void()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` LANGUAGE plpgsql()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### ` SECURITY DEFINER()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `AS $function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `DECLARE()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_order RECORD;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_item RECORD;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_qty INTEGER;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_direct BOOLEAN;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_reason TEXT;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `BEGIN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF p_admin_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'admin_id es requerido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SELECT id, admin_id, customer_id, status, order_type, courier_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  INTO v_order()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FROM orders()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = p_order_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  FOR UPDATE;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF NOT FOUND THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'Pedido no encontrado';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_order.admin_id IS DISTINCT FROM p_admin_id THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'No autorizado para cancelar este pedido';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_order.status = 'cancelled' THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    RAISE EXCEPTION 'El pedido ya esta cancelado';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_direct := (v_order.order_type = 'direct');()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  v_reason := LEFT(COALESCE(NULLIF(TRIM(p_reason), ''), 'sin motivo'), 500);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  IF v_direct AND v_order.status = 'delivered' THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    FOR v_item IN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SELECT id, quantity, COALESCE(returned_quantity, 0) AS rq()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FROM order_items()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE order_id = p_order_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    LOOP()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_qty := v_item.quantity - v_item.rq;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      IF v_qty > 0 THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        PERFORM return_stock_by_item(v_item.id, v_qty, p_admin_id);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END LOOP;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  ELSIF (NOT v_direct) AND v_order.status IN ('delivered', 'partial', 'returned') THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    FOR v_item IN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      SELECT id, quantity, COALESCE(returned_quantity, 0) AS rq()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      FROM order_items()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      WHERE order_id = p_order_id()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    LOOP()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      v_qty := v_item.quantity - v_item.rq;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      IF v_qty > 0 THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        IF v_order.courier_id IS NULL THEN()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `          RAISE EXCEPTION 'Pedido de domicilio sin domiciliario asignado; no se puede revertir el inventario consumido en entrega';()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `        PERFORM return_courier_stock_by_item(v_item.id, v_qty, p_admin_id, v_order.courier_id);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `      END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    END LOOP;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  END IF;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  DELETE FROM payments WHERE order_id = p_order_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  UPDATE orders()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  SET()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    status = 'cancelled',()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    notes = TRIM(COALESCE(notes, '') || E'\n[CANCELADO por admin] ' || v_reason),()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `    updated_at = NOW()()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  WHERE id = p_order_id;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `  PERFORM update_customer_balance(v_order.customer_id);()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `END;()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
+
+### `$function$()`
+- **Retorna**: 
+- **Seguridad**: 
+
+```sql
+
+```
 
 ### `block_courier_deactivation_with_stock()`
 - **Retorna**: trigger
@@ -10292,14 +10828,6 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
-### `  -- Lock the customer row to serialize balance updates.()`
-- **Retorna**: 
-- **Seguridad**: 
-
-```sql
-
-```
-
 ### `  SELECT admin_id INTO v_admin_id()`
 - **Retorna**: 
 - **Seguridad**: 
@@ -10388,7 +10916,7 @@ CREATE OR REPLACE FUNCTION public.update_customer_balance(p_customer_id uuid)
 
 ```
 
-### `    AND status NOT IN ('returned');()`
+### `    AND status NOT IN ('returned', 'cancelled');()`
 - **Retorna**: 
 - **Seguridad**: 
 

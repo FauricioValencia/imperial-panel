@@ -5,6 +5,7 @@ import {
   productSchema,
   createOrderSchema,
   registerPaymentSchema,
+  cancelOrderSchema,
 } from "@/types";
 
 describe("loginSchema", () => {
@@ -171,6 +172,31 @@ describe("registerPaymentSchema", () => {
       amount: 1000,
       type: "full",
       payment_method: "bitcoin",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("cancelOrderSchema", () => {
+  it("accepts order id only", () => {
+    const result = cancelOrderSchema.safeParse({
+      order_id: "550e8400-e29b-41d4-a716-446655440000",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts optional reason", () => {
+    const result = cancelOrderSchema.safeParse({
+      order_id: "550e8400-e29b-41d4-a716-446655440000",
+      reason: "Cliente reclamo",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects reason longer than 500 chars", () => {
+    const result = cancelOrderSchema.safeParse({
+      order_id: "550e8400-e29b-41d4-a716-446655440000",
+      reason: "x".repeat(501),
     });
     expect(result.success).toBe(false);
   });

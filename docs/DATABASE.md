@@ -193,7 +193,7 @@ El precio efectivo al armar un pedido es `custom_price` si hay fila activa; si n
 | cliente_id | UUID | NO | — | FK clientes |
 | mensajero_id | UUID | SI | — | FK usuarios, null si no asignado |
 | order_type | text | NO | delivery | CHECK: `delivery` (flujo domicilio), `direct` (venta mostrador, stock central al registrar) |
-| estado | TEXT | NO | 'pendiente' | CHECK: pendiente, asignado, en_camino, entregado, devuelto, parcial |
+| estado | TEXT | NO | 'pendiente' | CHECK: pendiente, asignado, en_camino, entregado, devuelto, parcial, **cancelado** |
 | total | NUMERIC(12,2) | NO | 0 | Suma de items |
 | notas | TEXT | SI | — | |
 | fecha_asignacion | TIMESTAMPTZ | SI | — | Se llena al asignar mensajero |
@@ -342,10 +342,13 @@ Todas las tablas tienen RLS habilitado.
 ## Flujo de Stock
 
 ```
-Crear pedido (pendiente)     → Stock NO se toca
-Asignar mensajero (asignado) → Stock SE DESCUENTA (via descontar_stock RPC)
-Entrega confirmada           → Sin cambio de stock
-Devolucion                   → Stock SE REINGRESA (via reingresar_stock RPC)
+Pedido delivery (pendiente)      → No descuenta stock (solo validacion global al crear)
+Asignar mensajero              → No descuenta stock; el courier debe tener inventario previo
+Entrega confirmada (mensajero) → deduct_courier_stock desde bodega del courier
+Venta directa (mostrador)      → deduct_stock bodega central al crear (orden ya entregada)
+Cancelacion admin              → RPC admin_cancel_order: revierte segun tipo (central vs courier),
+                                 borra pagos del pedido, estado cancelled
+Devolucion parcial/total (app mensajero) → Segun confirmDelivery + movements
 ```
 
 **Regla critica**: NUNCA modificar `productos.stock` directamente con UPDATE. Siempre usar las funciones RPC que incluyen `FOR UPDATE` para evitar race conditions.
@@ -355,10 +358,10 @@ Devolucion                   → Stock SE REINGRESA (via reingresar_stock RPC)
 ## Flujo de Saldo Cliente
 
 ```
-Se crea pedido       → saldo_pendiente aumenta
+Se crea pedido       → saldo_pendiente aumenta (pedidos no cancelados ni devueltos)
 Se registra pago     → saldo_pendiente disminuye
+Pedido cancelado     → se eliminan pagos del pedido y `update_customer_balance` excluye cancelled del total
 Pedido devuelto      → saldo_pendiente se recalcula
 ```
 
-Recalculo via `actualizar_saldo_cliente(cliente_id)`:
-`saldo = SUM(pedidos.total donde estado != 'devuelto') - SUM(pagos.monto)`
+Recalculo via `update_customer_balance(cliente_id)` (total pedidos + cargos - pagos); pedidos `returned` y `cancelled` no suman en total de pedidos.

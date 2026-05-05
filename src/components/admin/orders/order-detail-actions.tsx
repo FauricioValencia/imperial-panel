@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Truck, CheckCircle } from "lucide-react";
+import { UserPlus, Truck, CheckCircle, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AssignCourierDialog } from "./assign-courier-dialog";
+import { CancelOrderDialog } from "./cancel-order-dialog";
 import { markInTransit } from "@/actions/orders";
 import type { Order, User } from "@/types";
 
@@ -16,8 +17,10 @@ interface OrderDetailActionsProps {
 export function OrderDetailActions({ order, couriers }: OrderDetailActionsProps) {
   const router = useRouter();
   const [showAssign, setShowAssign] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const isCancelled = order.status === "cancelled";
 
   function handleMarkInTransit() {
     setError("");
@@ -33,11 +36,11 @@ export function OrderDetailActions({ order, couriers }: OrderDetailActionsProps)
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {error && (
           <span className="text-sm text-[#EF4444]">{error}</span>
         )}
-        {order.status === "pending" && (
+        {!isCancelled && order.status === "pending" && (
           <Button
             onClick={() => setShowAssign(true)}
             className="bg-[#10B981] hover:bg-[#059669]"
@@ -46,7 +49,7 @@ export function OrderDetailActions({ order, couriers }: OrderDetailActionsProps)
             Asignar
           </Button>
         )}
-        {order.status === "assigned" && (
+        {!isCancelled && order.status === "assigned" && (
           <Button
             onClick={handleMarkInTransit}
             disabled={isPending}
@@ -56,11 +59,29 @@ export function OrderDetailActions({ order, couriers }: OrderDetailActionsProps)
             {isPending ? "Actualizando..." : "Marcar en camino"}
           </Button>
         )}
-        {(order.status === "delivered" || order.status === "returned" || order.status === "partial") && (
+        {isCancelled && (
+          <div className="flex items-center gap-2 text-sm text-[#64748B]">
+            <Ban className="h-4 w-4 text-[#64748B]" />
+            Pedido cancelado
+          </div>
+        )}
+        {(order.status === "delivered" || order.status === "returned" || order.status === "partial") &&
+          !isCancelled && (
           <div className="flex items-center gap-2 text-sm text-[#64748B]">
             <CheckCircle className="h-4 w-4 text-[#10B981]" />
             Pedido finalizado
           </div>
+        )}
+        {!isCancelled && (
+          <Button
+            type="button"
+            variant="outline"
+            className="border-[#EF4444] text-[#EF4444] hover:bg-red-50"
+            onClick={() => setShowCancel(true)}
+          >
+            <Ban className="mr-2 h-4 w-4" />
+            Cancelar pedido
+          </Button>
         )}
       </div>
 
@@ -69,6 +90,13 @@ export function OrderDetailActions({ order, couriers }: OrderDetailActionsProps)
         onClose={() => setShowAssign(false)}
         order={order}
         couriers={couriers}
+      />
+      <CancelOrderDialog
+        open={showCancel}
+        onClose={() => setShowCancel(false)}
+        orderId={order.id}
+        orderLabel={`Pedido #${order.id.slice(0, 8)}`}
+        onSuccess={() => router.refresh()}
       />
     </>
   );
