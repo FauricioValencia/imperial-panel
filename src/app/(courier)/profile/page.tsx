@@ -3,6 +3,7 @@ import { getCurrentUser, signOut } from "@/actions/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LogOut, User, Mail } from "lucide-react";
+import { CopyableField } from "@/components/courier/copyable-field";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
@@ -29,15 +30,18 @@ export default async function ProfilePage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3 text-sm text-[#64748B]">
-            <Mail className="h-4 w-4 shrink-0" />
-            <span>{user.email}</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-[#64748B]">
-            <User className="h-4 w-4 shrink-0" />
-            <span>ID: {user.id.slice(0, 8)}</span>
-          </div>
+        <CardContent className="space-y-2">
+          <CopyableField
+            icon={Mail}
+            label="Correo"
+            value={user.email}
+          />
+          <CopyableField
+            icon={User}
+            label="ID"
+            value={`ID: ${user.id.slice(0, 8)}`}
+            copyValue={user.id}
+          />
         </CardContent>
       </Card>
 
