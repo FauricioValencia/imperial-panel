@@ -42,11 +42,17 @@ export function BillingTable({ customers }: BillingTableProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm text-[#64748B]">Total por cobrar</p>
           <p className="text-xl font-bold text-[#EF4444] sm:text-2xl">
             {formatCurrency(totalPending)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm text-[#64748B]">Total clientes</p>
+          <p className="text-xl font-bold text-[#1E293B] sm:text-2xl">
+            {customers.length}
           </p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
