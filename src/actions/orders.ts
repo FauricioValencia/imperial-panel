@@ -16,6 +16,12 @@ import {
   cargarPreciosResueltosPorProducto,
   validarItemsContraPreciosResueltos,
 } from "@/lib/customer-pricing";
+import {
+  aggregateRequiredByProduct,
+  computeStockShortages,
+  formatShortageError,
+  type InventoryGlobalRow,
+} from "@/lib/inventory-validation";
 
 export async function listOrders(
   statusFilter?: string
@@ -355,45 +361,32 @@ export async function assignCourier(
     return { success: false, error: "Order must be pending to assign a courier" };
   }
 
-  // Agregar items por producto (puede haber duplicados)
-  const itemsByProduct = new Map<string, number>();
-  for (const it of (order.items as { product_id: string; quantity: number }[]) ?? []) {
-    itemsByProduct.set(
-      it.product_id,
-      (itemsByProduct.get(it.product_id) ?? 0) + it.quantity
-    );
-  }
-  const validationItems = Array.from(itemsByProduct.entries()).map(([product_id, quantity]) => ({
-    product_id,
-    quantity,
-  }));
+  // Validar contra inventory_global (central + couriers vigentes), mismo
+  // patron que createOrder. La bodega del courier es un kit de cambios en
+  // sitio: el stock del pedido sale del central al confirmar entrega.
+  const requiredByProduct = aggregateRequiredByProduct(
+    (order.items as { product_id: string; quantity: number }[]) ?? []
+  );
+  const { data: stockRows, error: stockFetchError } = await ctx.supabase
+    .from("inventory_global")
+    .select("product_id, name, available_global")
+    .eq("admin_id", ctx.user.id)
+    .in("product_id", Array.from(requiredByProduct.keys()));
 
-  // Validar que el courier tenga stock suficiente en su bodega
-  const { data: shortages, error: validationError } = await ctx.supabase.rpc(
-    "validate_courier_has_stock",
-    { p_courier_id: courierId, p_items: validationItems }
+  if (stockFetchError) {
+    logError("assign_courier_stock_check", stockFetchError, { order_id: orderId, courier_id: courierId });
+    return { success: false, error: "Error verificando stock disponible" };
+  }
+
+  const shortageList = computeStockShortages(
+    requiredByProduct,
+    (stockRows as InventoryGlobalRow[] | null) ?? []
   );
 
-  if (validationError) {
-    logError("validate_courier_stock", validationError, { order_id: orderId, courier_id: courierId });
-    return { success: false, error: "Error validando bodega del courier" };
-  }
-
-  type Shortage = {
-    product_id: string;
-    product_name: string;
-    required: number;
-    available: number;
-    shortfall: number;
-  };
-  const shortageList = (shortages ?? []) as Shortage[];
-
   if (shortageList.length > 0) {
-    const first = shortageList[0];
-    const extra = shortageList.length > 1 ? ` (y ${shortageList.length - 1} mas)` : "";
     return {
       success: false,
-      error: `El courier no tiene stock suficiente: ${first.product_name} (faltan ${first.shortfall})${extra}. Transfiere stock primero.`,
+      error: formatShortageError(shortageList),
       data: { shortages: shortageList },
     };
   }
